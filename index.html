@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Norma Calculator</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Norma Calculator</h1>
+    <p class="subtitle">Compute work percentage against a production norm.</p>
+
+    <form id="norma-form" novalidate>
+      <div class="field">
+        <label for="completed">Completed units</label>
+        <input type="number" id="completed" name="completed" min="0" step="1" placeholder="e.g., 80" required />
+      </div>
+
+      <div class="field">
+        <label for="target">Target units (norm)</label>
+        <input type="number" id="target" name="target" min="1" step="1" placeholder="e.g., 100" required />
+      </div>
+
+      <button type="submit" id="calculate">Calculate</button>
+    </form>
+
+    <section id="result" class="result" aria-live="polite">
+      Enter values and press Calculate.
+    </section>
+  </main>
+
+  <script src="js/calculator.js" defer></script>
+</body>
+</html>
