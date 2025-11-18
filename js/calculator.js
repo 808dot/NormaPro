@@ -1,5 +1,6 @@
 (function () {
   const MAX_ROWS = 10;
+  const MAX_QTY_SELECT = 300;
   let furnitureMap = {};
   let names = [];
   let rowCount = 0;
@@ -24,10 +25,10 @@
 
   function calcRowResult(rowEl) {
     const select = rowEl.querySelector('select');
-    const qtyInput = rowEl.querySelector('input[type="number"]');
+    const qtyEl = rowEl.querySelector('[data-qty]');
     const resultCell = rowEl.querySelector('.result-cell');
     const name = select.value;
-    const qty = parseFloat(qtyInput.value || '0');
+    const qty = parseFloat(qtyEl && qtyEl.value ? qtyEl.value : '0');
     const unit = furnitureMap[name] || 0;
     const result = unit * (isNaN(qty) ? 0 : qty);
     resultCell.textContent = `${format2(result)} %`;
@@ -45,6 +46,50 @@
     computeTotal();
   }
 
+  function isMobileLike() {
+    return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints || 0) > 0;
+  }
+
+  function buildQtyControlMobile() {
+    const sel = document.createElement('select');
+    sel.setAttribute('data-qty', '1');
+    for (let i = 0; i <= MAX_QTY_SELECT; i++) {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = String(i);
+      sel.appendChild(opt);
+    }
+    return sel;
+  }
+
+  function buildQtyControlDesktop() {
+    const wrap = document.createElement('div');
+    wrap.className = 'qty';
+    const dec = document.createElement('button');
+    dec.type = 'button';
+    dec.className = 'qty-btn';
+    dec.setAttribute('aria-label', 'Decrease quantity');
+    dec.textContent = '−';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1';
+    input.placeholder = 'Qty';
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    input.pattern = '[0-9]*';
+    input.setAttribute('data-qty', '1');
+    const inc = document.createElement('button');
+    inc.type = 'button';
+    inc.className = 'qty-btn';
+    inc.setAttribute('aria-label', 'Increase quantity');
+    inc.textContent = '+';
+    wrap.appendChild(dec);
+    wrap.appendChild(input);
+    wrap.appendChild(inc);
+    return { wrap, dec, input, inc };
+  }
+
   function addRow() {
     if (rowCount >= MAX_ROWS) return;
     const rowsContainer = document.getElementById('rows');
@@ -52,21 +97,45 @@
     row.className = 'row';
 
     const select = buildSelect();
-    const qty = document.createElement('input');
-    qty.type = 'number';
-    qty.min = '0';
-    qty.step = '1';
-    qty.placeholder = 'Qty';
+    const mobile = isMobileLike();
+    let qtyWrap = null;
+    let qtyEl = null;
+    let dec = null;
+    let inc = null;
+    if (mobile) {
+      qtyEl = buildQtyControlMobile();
+      qtyWrap = qtyEl; // direct select element occupies the middle grid cell
+    } else {
+      const desktop = buildQtyControlDesktop();
+      qtyWrap = desktop.wrap;
+      qtyEl = desktop.input;
+      dec = desktop.dec;
+      inc = desktop.inc;
+    }
 
     const resultCell = document.createElement('div');
     resultCell.className = 'result-cell';
     resultCell.textContent = '0.00 %';
 
     select.addEventListener('change', onRowChange);
-    qty.addEventListener('input', onRowChange);
+    if (qtyEl.tagName === 'SELECT') {
+      qtyEl.addEventListener('change', onRowChange);
+    } else {
+      qtyEl.addEventListener('input', onRowChange);
+      dec.addEventListener('click', function(){
+        const v = Math.max(0, (parseInt(qtyEl.value || '0', 10) || 0) - 1);
+        qtyEl.value = String(v);
+        onRowChange();
+      });
+      inc.addEventListener('click', function(){
+        const v = (parseInt(qtyEl.value || '0', 10) || 0) + 1;
+        qtyEl.value = String(v);
+        onRowChange();
+      });
+    }
 
     row.appendChild(select);
-    row.appendChild(qty);
+    row.appendChild(qtyWrap);
     row.appendChild(resultCell);
     rowsContainer.appendChild(row);
 

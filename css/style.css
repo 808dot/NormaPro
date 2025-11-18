@@ -1,21 +1,29 @@
-/* Minimal, clean styling for Norma Calculator */
+/* Norma Calculator – modern minimal UI */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
 :root {
-  /* Modest neutral palette */
-  --bg: #f6f7f9;
-  --text: #1f2937;
+  --bg: #f5f7fb;
+  --text: #111827;
   --muted: #6b7280;
-  --accent: #4b5563; /* subtle grey button */
+  --accent: #2563eb;
+  --accent-600: #2563eb;
+  --accent-700: #1d4ed8;
   --border: #e5e7eb;
   --card: #ffffff;
   --soft: #f3f4f6;
+  --ring: rgba(37, 99, 235, 0.18);
+  --shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 24px rgba(0,0,0,0.06);
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  background: var(--bg);
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: radial-gradient(1200px 600px at 10% -10%, #eaf0ff 0%, transparent 60%),
+              radial-gradient(1000px 600px at 110% 10%, #eef3ff 0%, transparent 55%),
+              var(--bg);
   color: var(--text);
   font-size: clamp(16px, 2vw + 0.2rem, 18px);
   line-height: 1.5;
@@ -23,7 +31,6 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Center the app */
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -36,51 +43,29 @@ body {
   margin: 0;
   padding: 24px;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(0,0,0,0.04);
   border-radius: 12px;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+  box-shadow: var(--shadow);
 }
 
-h1 {
-  margin: 0 0 6px 0;
-  font-size: clamp(22px, 3vw, 28px);
-}
-
-.subtitle {
-  margin: 0 0 20px 0;
-  color: var(--muted);
-  font-size: 14px;
-}
+h1 { margin: 0 0 6px 0; font-size: clamp(22px, 3vw, 28px); }
+.subtitle { margin: 0 0 20px 0; color: var(--muted); font-size: 14px; }
 
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 label { font-size: 14px; color: var(--muted); }
 
-input[type="number"] {
+input[type="number"], select {
   padding: 10px 12px;
   font-size: 1rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   outline: none;
   background: #fff;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 80ms ease;
 }
-
-input[type="number"]:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.12);
-}
-
-select {
-  padding: 10px 12px;
-  font-size: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-}
-
-select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.12);
-}
+input[type="number"]:hover, select:hover { border-color: var(--accent-600); }
+input[type="number"]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--ring); }
+select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #9ca3af 50%), linear-gradient(135deg, #9ca3af 50%, transparent 50%); background-position: calc(100% - 18px) calc(1.1em), calc(100% - 13px) calc(1.1em); background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
 
 button {
   display: inline-flex;
@@ -90,13 +75,15 @@ button {
   padding: 10px 14px;
   font-size: 1rem;
   border: none;
-  border-radius: 8px;
-  background: var(--accent);
+  border-radius: 9999px;
+  background: linear-gradient(180deg, var(--accent-600), var(--accent-700));
   color: #fff;
   cursor: pointer;
+  transition: transform 80ms ease, filter 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 8px 18px rgba(29, 78, 216, 0.18);
 }
-
-button:hover { filter: brightness(0.97); }
+button:hover { filter: brightness(1.03); }
+button:active { transform: translateY(1px) scale(0.99); filter: brightness(0.98); }
 
 /* Rows */
 .rows { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
@@ -106,17 +93,38 @@ button:hover { filter: brightness(0.97); }
   gap: 10px;
   align-items: center;
 }
-
 .row select, .row input[type="number"] { width: 100%; min-width: 0; }
+
+/* Quantity picker */
+.qty { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; }
+.qty input[type="number"] { text-align: center; }
+.qty-btn {
+  padding: 8px 12px;
+  font-size: 1rem;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  transition: background 120ms ease, box-shadow 120ms ease, transform 80ms ease;
+}
+.qty-btn:hover { background: var(--soft); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.qty-btn:active { transform: translateY(1px); }
+
+/* Hide default number input spinners */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { appearance: textfield; -moz-appearance: textfield; }
 
 .result-cell {
   padding: 10px 12px;
   background: var(--soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-size: 1rem;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
 /* Controls */
@@ -130,21 +138,20 @@ button:hover { filter: brightness(0.97); }
   align-items: center;
   margin-top: 16px;
   padding: 12px;
-  background: var(--soft);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border: 1px solid rgba(0,0,0,0.04);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  gap: 12px;
 }
 .total-label { color: var(--muted); }
-.total-value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.total-value { font-size: clamp(18px, 1.8vw + 4px, 22px); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Touch target sizes */
-select, input[type="number"], button {
-  min-height: 44px;
-}
+select, input[type="number"], button { min-height: 44px; }
 
 /* Responsive */
 @media (max-width: 560px) {
-  /* Keep three columns on one line, just rebalance widths */
   .row { grid-template-columns: 1fr 0.8fr 0.7fr; }
   .controls { flex-wrap: wrap; }
   #add-row { width: 100%; }
@@ -152,6 +159,4 @@ select, input[type="number"], button {
 }
 
 /* Modern viewport height for mobile browsers */
-@supports (height: 100dvh) {
-  body { min-height: 100dvh; }
-}
+@supports (height: 100dvh) { body { min-height: 100dvh; } }
