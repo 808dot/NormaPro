@@ -9,24 +9,20 @@
 <body>
   <main class="container">
     <h1>Norma Calculator</h1>
-    <p class="subtitle">Compute work percentage against a production norm.</p>
+    <p class="subtitle">Calculate total % for selected furniture models.</p>
 
-    <form id="norma-form" novalidate>
-      <div class="field">
-        <label for="completed">Completed units</label>
-        <input type="number" id="completed" name="completed" min="0" step="1" placeholder="e.g., 80" required />
-      </div>
+    <section class="rows" id="rows" aria-live="polite">
+      <!-- Rows are added dynamically after data loads -->
+    </section>
 
-      <div class="field">
-        <label for="target">Target units (norm)</label>
-        <input type="number" id="target" name="target" min="1" step="1" placeholder="e.g., 100" required />
-      </div>
+    <div class="controls">
+      <button type="button" id="add-row" aria-label="Add row">+ Add Row</button>
+      <span class="hint" id="row-hint">Up to 10 rows</span>
+    </div>
 
-      <button type="submit" id="calculate">Calculate</button>
-    </form>
-
-    <section id="result" class="result" aria-live="polite">
-      Enter values and press Calculate.
+    <section class="summary" aria-live="polite">
+      <div class="total-label">TOTAL %</div>
+      <div class="total-value"><span id="total">0.00</span>%</div>
     </section>
   </main>
 
