@@ -1,5 +1,5 @@
 (function () {
-  const MAX_ROWS = 10;
+  const MAX_ROWS = 20;
   const MAX_QTY_SELECT = 300;
   let furnitureMap = {};
   let names = [];
