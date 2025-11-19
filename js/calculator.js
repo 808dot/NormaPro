@@ -9,22 +9,61 @@
 
   function buildSelect() {
     const select = document.createElement('select');
+    select.setAttribute('data-role', 'model');
     const placeholder = document.createElement('option');
     placeholder.value = '';
     placeholder.textContent = 'Select furniture';
     placeholder.disabled = false;
     select.appendChild(placeholder);
-    for (const name of names) {
+
+    // Group by first word (e.g., "Verde ..." -> group "Verde")
+    const counts = Object.create(null);
+    for (const n of names) {
+      const base = n.split(' ')[0];
+      counts[base] = (counts[base] || 0) + 1;
+    }
+
+    const groups = new Map();
+    const singles = [];
+    for (const n of names) {
+      const base = n.split(' ')[0];
+      if (counts[base] > 1 && base !== n) {
+        if (!groups.has(base)) groups.set(base, []);
+        groups.get(base).push(n);
+      } else {
+        singles.push(n);
+      }
+    }
+
+    // Append singles
+    singles.sort((a,b)=>a.localeCompare(b));
+    for (const name of singles) {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
       select.appendChild(opt);
     }
+
+    // Append groups alphabetically
+    const groupLabels = Array.from(groups.keys()).sort((a,b)=>a.localeCompare(b));
+    for (const label of groupLabels) {
+      const og = document.createElement('optgroup');
+      og.label = label; // most browsers render optgroup labels bold by default
+      const items = groups.get(label).slice().sort((a,b)=>a.localeCompare(b));
+      for (const name of items) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        og.appendChild(opt);
+      }
+      select.appendChild(og);
+    }
+
     return select;
   }
 
   function calcRowResult(rowEl) {
-    const select = rowEl.querySelector('select');
+    const select = rowEl.querySelector('select[data-role="model"]');
     const qtyEl = rowEl.querySelector('[data-qty]');
     const resultCell = rowEl.querySelector('.result-cell');
     const name = select.value;
