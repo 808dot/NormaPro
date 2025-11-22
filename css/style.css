@@ -160,6 +160,14 @@ input[type=number] { appearance: textfield; -moz-appearance: textfield; }
 /* Touch target sizes */
 select, input[type="number"], button { min-height: 44px; }
 
+/* Segmented control for direction picker */
+.segmented { display:inline-flex; background: rgba(15,23,42,0.03); padding: 4px; border-radius: 10px; gap:4px; }
+.seg-btn {
+  padding: 8px 10px; border-radius: 8px; border: none; background: transparent; color: var(--text); font-weight:500; cursor:pointer;
+}
+.seg-btn[aria-pressed="true"]{ background: linear-gradient(180deg,var(--accent-600),var(--accent-700)); color:#fff; box-shadow: 0 6px 18px rgba(37,99,235,0.12); }
+.seg-btn:focus{ outline: none; box-shadow: 0 0 0 4px var(--ring); }
+
 /* Responsive */
 @media (max-width: 560px) {
   .row { grid-template-columns: 1fr 0.8fr 0.7fr; }

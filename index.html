@@ -11,8 +11,41 @@
     <h1>Norma Calculator</h1>
     <p class="subtitle">Calculate total % for selected furniture models.</p>
 
+    <div class="view-toggle" style="display:flex;gap:8px;margin:14px 0 4px 0;">
+      <button type="button" id="view-norma" class="btn-toggle" aria-pressed="true">Norma</button>
+      <button type="button" id="view-hours" class="btn-toggle" aria-pressed="false">6h ↔ 8h</button>
+    </div>
+
     <section class="rows" id="rows" aria-live="polite">
       <!-- Rows are added dynamically after data loads -->
+    </section>
+
+    <!-- Hours converter (hidden by default) -->
+    <section id="hours-converter" style="display:none;margin-top:12px;">
+      <form id="hours-form" onsubmit="return false;" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;gap:10px;align-items:center;">
+          <label for="input-percent" style="min-width:110px;color:var(--muted);">Input percentage</label>
+          <input id="input-percent" type="number" min="0" step="0.01" placeholder="e.g. 75" style="flex:1;" />
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;">
+          <label style="min-width:110px;color:var(--muted);">From → To</label>
+          <div style="flex:1;display:flex;gap:8px;align-items:center;">
+            <select id="from-hours" aria-label="From hours" style="width:88px;">
+              <!-- options added in JS fallback to 6 -->
+            </select>
+            <div style="color:var(--muted);">→</div>
+            <select id="to-hours" aria-label="To hours" style="width:88px;">
+              <!-- options added in JS fallback to 8 -->
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button id="calc-hours" type="button">Calculate</button>
+          <div id="hours-result" style="color:var(--text);font-weight:600;">Result: —</div>
+        </div>
+      </form>
     </section>
 
     <div class="controls">
@@ -27,5 +60,70 @@
   </main>
 
   <script src="js/calculator.js" defer></script>
+  <script>
+    // View toggle logic and embedded hours converter (single-file as requested)
+    (function(){
+      function $(id){return document.getElementById(id);}
+      const normaBtn = $('view-norma');
+      const hoursBtn = $('view-hours');
+      const rows = $('rows');
+      const controls = document.querySelector('.controls');
+      const summary = document.querySelector('.summary');
+      const hoursSection = $('hours-converter');
+
+      function showView(v){
+        if(v==='norma'){
+          rows.style.display = '';
+          controls.style.display = '';
+          summary.style.display = '';
+          hoursSection.style.display = 'none';
+          normaBtn.setAttribute('aria-pressed','true');
+          hoursBtn.setAttribute('aria-pressed','false');
+        } else {
+          rows.style.display = 'none';
+          controls.style.display = 'none';
+          summary.style.display = 'none';
+          hoursSection.style.display = '';
+          normaBtn.setAttribute('aria-pressed','false');
+          hoursBtn.setAttribute('aria-pressed','true');
+        }
+      }
+
+      normaBtn.addEventListener('click', ()=> showView('norma'));
+      hoursBtn.addEventListener('click', ()=> showView('hours'));
+
+      // Hours converter
+      const input = $('input-percent');
+      const fromSel = $('from-hours');
+      const toSel = $('to-hours');
+      const calc = $('calc-hours');
+      const result = $('hours-result');
+
+      // populate hours selects 1..10
+      for (let h = 1; h <= 10; h++){
+        const o1 = document.createElement('option'); o1.value = String(h); o1.textContent = `${h} h`;
+        const o2 = document.createElement('option'); o2.value = String(h); o2.textContent = `${h} h`;
+        fromSel.appendChild(o1); toSel.appendChild(o2);
+      }
+      // sensible defaults
+      fromSel.value = '6';
+      toSel.value = '8';
+
+      function calcHours(){
+        const v = parseFloat(input.value);
+        if(isNaN(v)) { result.textContent = 'Result: —'; return; }
+        const from = parseFloat(fromSel.value) || 6;
+        const to = parseFloat(toSel.value) || 8;
+        const out = v * (from / to);
+        result.textContent = `Result: ${out.toFixed(2)}%`;
+      }
+
+      calc.addEventListener('click', calcHours);
+      input.addEventListener('keydown', function(e){ if(e.key === 'Enter') calcHours(); });
+
+      // start on norma view
+      showView('norma');
+    })();
+  </script>
 </body>
 </html>
