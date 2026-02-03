@@ -1,97 +1,336 @@
+/**
+ * NormaPro - Główny moduł kalkulatora
+ * 
+ * Zawiera logikę:
+ * - Kalkulatora normy (wybór mebli + ilość)
+ * - Przelicznika godzin (konwersja między normami)
+ * - Kalkulatora zespołowego (podział pracy)
+ * - Zarządzania widokami
+ * 
+ * @author NormaPro Team
+ * @version 2.0.0
+ */
+
 (function () {
-  const MAX_ROWS = 20;
-  const MAX_QTY_SELECT = 300;
+  'use strict';
+
+  // ============================================
+  // KONFIGURACJA I STAŁE
+  // ============================================
+  
+  /**
+   * Maksymalna liczba wierszy w kalkulatorze
+   */
+  const MAX_ROWS = NormaConfig?.MAX_ROWS || 20;
+  
+  /**
+   * Maksymalna wartość w selekcie ilości (mobile)
+   */
+  const MAX_QTY_SELECT = NormaConfig?.MAX_QTY_SELECT || 300;
+  
+  /**
+   * Domyślna norma godzinowa (ZMIANA: 8h → 7h)
+   */
+  let currentNormHours = NormaConfig?.DEFAULT_NORM_HOURS || 7;
+
+  // ============================================
+  // STAN APLIKACJI
+  // ============================================
+  
+  /**
+   * Mapa mebli: nazwa → procent normy
+   */
   let furnitureMap = {};
-  let names = [];
+  
+  /**
+   * Posortowana lista nazw mebli
+   */
+  let furnitureNames = [];
+  
+  /**
+   * Aktualna liczba wierszy (kalkulator główny)
+   */
   let rowCount = 0;
+  
+  /**
+   * Aktualna liczba wierszy (kalkulator zespołowy)
+   */
+  let teamRowCount = 0;
+  
+  /**
+   * Aktualny widok
+   */
+  let currentView = 'norma';
 
-  function format2(n) { return n.toFixed(2); }
+  // ============================================
+  // FUNKCJE POMOCNICZE
+  // ============================================
 
-  function buildSelect() {
+  /**
+   * Skrót do getElementById
+   * @param {string} id - ID elementu
+   * @returns {HTMLElement|null}
+   */
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  /**
+   * Formatuje liczbę do 2 miejsc po przecinku
+   * @param {number} n - Liczba
+   * @returns {string}
+   */
+  function format2(n) {
+    return n.toFixed(2);
+  }
+
+  /**
+   * Formatuje czas (godziny) do czytelnej postaci
+   * @param {number} hours - Czas w godzinach
+   * @returns {string}
+   */
+  function formatTime(hours) {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    if (h === 0) return `${m}min`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}min`;
+  }
+
+  /**
+   * Sprawdza czy urządzenie ma ekran dotykowy
+   * @returns {boolean}
+   */
+  function isMobileLike() {
+    return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) 
+      || (navigator.maxTouchPoints || 0) > 0;
+  }
+
+  /**
+   * Pokazuje powiadomienie toast
+   * @param {string} message - Treść
+   * @param {string} type - Typ: 'success', 'error', 'info'
+   */
+  function showToast(message, type = 'info') {
+    // Usuń istniejące toasty
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // Auto-usuwanie po 3s
+    setTimeout(() => {
+      toast.classList.add('toast-hide');
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  // ============================================
+  // ZARZĄDZANIE WIDOKAMI
+  // ============================================
+
+  /**
+   * Przełącza widok aplikacji
+   * @param {string} viewName - Nazwa widoku: 'norma', 'hours', 'team', 'workers'
+   */
+  function switchView(viewName) {
+    currentView = viewName;
+    
+    // Ukryj wszystkie sekcje
+    document.querySelectorAll('.view-section').forEach(section => {
+      section.hidden = true;
+      section.classList.remove('active');
+    });
+    
+    // Pokaż wybraną sekcję
+    const targetSection = $(`${viewName}-section`);
+    if (targetSection) {
+      targetSection.hidden = false;
+      targetSection.classList.add('active');
+    }
+    
+    // Aktualizuj przyciski nawigacji
+    document.querySelectorAll('.view-toggle .btn-toggle').forEach(btn => {
+      const isActive = btn.id === `view-${viewName}`;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    // Odśwież dane specyficzne dla widoku
+    if (viewName === 'team') {
+      refreshTeamWorkersList();
+    } else if (viewName === 'workers') {
+      refreshWorkersList();
+    }
+  }
+
+  /**
+   * Inicjalizuje nawigację widoków
+   */
+  function initViewNavigation() {
+    const viewButtons = ['norma', 'hours', 'team', 'workers'];
+    
+    viewButtons.forEach(view => {
+      const btn = $(`view-${view}`);
+      if (btn) {
+        btn.addEventListener('click', () => switchView(view));
+      }
+    });
+  }
+
+  // ============================================
+  // BUDOWANIE SELEKTÓW
+  // ============================================
+
+  /**
+   * Buduje select z listą mebli (pogrupowany)
+   * @returns {HTMLSelectElement}
+   */
+  function buildFurnitureSelect() {
     const select = document.createElement('select');
     select.setAttribute('data-role', 'model');
+    select.className = 'furniture-select';
+    
+    // Placeholder
     const placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = 'Select furniture';
+    placeholder.textContent = 'Wybierz mebel...';
     placeholder.disabled = false;
     select.appendChild(placeholder);
 
-    // Group by first word (e.g., "Verde ..." -> group "Verde")
+    // Grupowanie mebli po pierwszym słowie
+    const groups = new Map();
+    const singles = [];
+
+    // Zlicz ile mebli w każdej grupie
     const counts = Object.create(null);
-    for (const n of names) {
-      const base = n.split(' ')[0];
+    for (const name of furnitureNames) {
+      const base = name.split(' ')[0];
       counts[base] = (counts[base] || 0) + 1;
     }
 
-    const groups = new Map();
-    const singles = [];
-    for (const n of names) {
-      const base = n.split(' ')[0];
-      if (counts[base] > 1 && base !== n) {
+    // Podziel na grupy i pojedyncze
+    for (const name of furnitureNames) {
+      const base = name.split(' ')[0];
+      if (counts[base] > 1 && base !== name) {
         if (!groups.has(base)) groups.set(base, []);
-        groups.get(base).push(n);
+        groups.get(base).push(name);
       } else {
-        singles.push(n);
+        singles.push(name);
       }
     }
 
-    // Append singles
-    singles.sort((a,b)=>a.localeCompare(b));
+    // Dodaj pojedyncze meble
+    singles.sort((a, b) => a.localeCompare(b, 'pl'));
     for (const name of singles) {
       const opt = document.createElement('option');
       opt.value = name;
-      opt.textContent = name;
+      opt.textContent = `${name} (${format2(furnitureMap[name])}%)`;
       select.appendChild(opt);
     }
 
-    // Append groups alphabetically
-    const groupLabels = Array.from(groups.keys()).sort((a,b)=>a.localeCompare(b));
+    // Dodaj grupy
+    const groupLabels = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, 'pl'));
     for (const label of groupLabels) {
-      const og = document.createElement('optgroup');
-      og.label = label; // most browsers render optgroup labels bold by default
-      const items = groups.get(label).slice().sort((a,b)=>a.localeCompare(b));
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = label;
+      
+      const items = groups.get(label).slice().sort((a, b) => a.localeCompare(b, 'pl'));
       for (const name of items) {
         const opt = document.createElement('option');
         opt.value = name;
-        opt.textContent = name;
-        og.appendChild(opt);
+        opt.textContent = `${name} (${format2(furnitureMap[name])}%)`;
+        optgroup.appendChild(opt);
       }
-      select.appendChild(og);
+      select.appendChild(optgroup);
     }
 
     return select;
   }
 
-  function calcRowResult(rowEl) {
-    const select = rowEl.querySelector('select[data-role="model"]');
-    const qtyEl = rowEl.querySelector('[data-qty]');
-    const resultCell = rowEl.querySelector('.result-cell');
-    const name = select.value;
-    const qty = parseFloat(qtyEl && qtyEl.value ? qtyEl.value : '0');
-    const unit = furnitureMap[name] || 0;
-    const result = unit * (isNaN(qty) ? 0 : qty);
-    resultCell.textContent = `${format2(result)} %`;
-    return result;
+  /**
+   * Generuje opcje czasowe dla przelicznika godzin
+   * Krok co 10 minut (ZMIANA z 1 godziny)
+   */
+  function populateTimeSelects() {
+    const fromSel = $('from-hours');
+    const toSel = $('to-hours');
+    
+    if (!fromSel || !toSel) return;
+
+    // Wyczyść
+    fromSel.innerHTML = '';
+    toSel.innerHTML = '';
+
+    // Generuj opcje co 10 minut od 1h do 12h
+    const stepMinutes = NormaConfig?.TIME_STEP_MINUTES || 10;
+    const stepHours = stepMinutes / 60;
+    const minHours = NormaConfig?.MIN_HOURS || 1;
+    const maxHours = NormaConfig?.MAX_HOURS || 12;
+
+    for (let h = minHours; h <= maxHours; h += stepHours) {
+      const hours = Math.floor(h);
+      const minutes = Math.round((h - hours) * 60);
+      
+      let label;
+      if (minutes === 0) {
+        label = `${hours}h`;
+      } else {
+        label = `${hours}h ${minutes}min`;
+      }
+
+      const opt1 = document.createElement('option');
+      opt1.value = h.toFixed(2);
+      opt1.textContent = label;
+      fromSel.appendChild(opt1);
+
+      const opt2 = document.createElement('option');
+      opt2.value = h.toFixed(2);
+      opt2.textContent = label;
+      toSel.appendChild(opt2);
+    }
+
+    // Domyślne wartości: 8h → 7h
+    const defaultFrom = NormaConfig?.DEFAULT_CONVERTER?.FROM_HOURS || 8;
+    const defaultTo = NormaConfig?.DEFAULT_CONVERTER?.TO_HOURS || 7;
+    fromSel.value = defaultFrom.toFixed(2);
+    toSel.value = defaultTo.toFixed(2);
   }
 
-  function computeTotal() {
-    const rows = document.querySelectorAll('#rows .row');
-    let total = 0;
-    rows.forEach(r => { total += calcRowResult(r); });
-    document.getElementById('total').textContent = format2(total);
+  /**
+   * Populuje select normy w modalu
+   */
+  function populateNormSelect() {
+    const normInput = $('norm-hours-input');
+    if (!normInput) return;
+
+    normInput.innerHTML = '';
+    
+    for (let h = 5; h <= 10; h++) {
+      const opt = document.createElement('option');
+      opt.value = h;
+      opt.textContent = `${h} godzin`;
+      if (h === currentNormHours) opt.selected = true;
+      normInput.appendChild(opt);
+    }
   }
 
-  function onRowChange() {
-    computeTotal();
-  }
+  // ============================================
+  // KALKULATOR NORMY
+  // ============================================
 
-  function isMobileLike() {
-    return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || (navigator.maxTouchPoints || 0) > 0;
-  }
-
+  /**
+   * Kontrolka ilości dla mobile (select)
+   * @returns {HTMLSelectElement}
+   */
   function buildQtyControlMobile() {
     const sel = document.createElement('select');
     sel.setAttribute('data-qty', '1');
+    sel.className = 'qty-select';
+    
     for (let i = 0; i <= MAX_QTY_SELECT; i++) {
       const opt = document.createElement('option');
       opt.value = String(i);
@@ -101,49 +340,115 @@
     return sel;
   }
 
+  /**
+   * Kontrolka ilości dla desktop (+/- przyciski)
+   * @returns {Object}
+   */
   function buildQtyControlDesktop() {
     const wrap = document.createElement('div');
     wrap.className = 'qty';
+    
     const dec = document.createElement('button');
     dec.type = 'button';
     dec.className = 'qty-btn';
-    dec.setAttribute('aria-label', 'Decrease quantity');
+    dec.setAttribute('aria-label', 'Zmniejsz ilość');
     dec.textContent = '−';
+    
     const input = document.createElement('input');
     input.type = 'number';
     input.min = '0';
     input.step = '1';
-    input.placeholder = 'Qty';
+    input.placeholder = 'Ilość';
     input.inputMode = 'numeric';
     input.autocomplete = 'off';
     input.pattern = '[0-9]*';
     input.setAttribute('data-qty', '1');
+    
     const inc = document.createElement('button');
     inc.type = 'button';
     inc.className = 'qty-btn';
-    inc.setAttribute('aria-label', 'Increase quantity');
+    inc.setAttribute('aria-label', 'Zwiększ ilość');
     inc.textContent = '+';
+    
     wrap.appendChild(dec);
     wrap.appendChild(input);
     wrap.appendChild(inc);
+    
     return { wrap, dec, input, inc };
   }
 
+  /**
+   * Oblicza wynik dla pojedynczego wiersza
+   * @param {HTMLElement} rowEl - Element wiersza
+   * @returns {number} Procent normy
+   */
+  function calcRowResult(rowEl) {
+    const select = rowEl.querySelector('select[data-role="model"]');
+    const qtyEl = rowEl.querySelector('[data-qty]');
+    const resultCell = rowEl.querySelector('.result-cell');
+    
+    const name = select?.value || '';
+    const qty = parseFloat(qtyEl?.value || '0');
+    const unit = furnitureMap[name] || 0;
+    const result = unit * (isNaN(qty) ? 0 : qty);
+    
+    if (resultCell) {
+      resultCell.textContent = `${format2(result)}%`;
+    }
+    
+    return result;
+  }
+
+  /**
+   * Oblicza sumę wszystkich wierszy i aktualizuje UI
+   */
+  function computeTotal() {
+    const rows = document.querySelectorAll('#rows .row');
+    let total = 0;
+    
+    rows.forEach(row => {
+      total += calcRowResult(row);
+    });
+    
+    // Aktualizuj sumę
+    const totalEl = $('total');
+    if (totalEl) {
+      totalEl.textContent = format2(total);
+    }
+  }
+
+  /**
+   * Handler zmiany w wierszu
+   */
+  function onRowChange() {
+    computeTotal();
+  }
+
+  /**
+   * Dodaje nowy wiersz do kalkulatora
+   */
   function addRow() {
-    if (rowCount >= MAX_ROWS) return;
-    const rowsContainer = document.getElementById('rows');
+    if (rowCount >= MAX_ROWS) {
+      showToast('Osiągnięto maksymalną liczbę wierszy', 'error');
+      return;
+    }
+    
+    const rowsContainer = $('rows');
+    if (!rowsContainer) return;
+
     const row = document.createElement('div');
     row.className = 'row';
 
-    const select = buildSelect();
+    // Select mebla
+    const select = buildFurnitureSelect();
+    
+    // Kontrolka ilości
     const mobile = isMobileLike();
-    let qtyWrap = null;
-    let qtyEl = null;
-    let dec = null;
-    let inc = null;
+    let qtyWrap, qtyEl, dec, inc;
+    
     if (mobile) {
       qtyEl = buildQtyControlMobile();
-      qtyWrap = qtyEl; // direct select element occupies the middle grid cell
+      qtyWrap = qtyEl;
     } else {
       const desktop = buildQtyControlDesktop();
       qtyWrap = desktop.wrap;
@@ -152,69 +457,892 @@
       inc = desktop.inc;
     }
 
+    // Komórka wyniku
     const resultCell = document.createElement('div');
     resultCell.className = 'result-cell';
-    resultCell.textContent = '0.00 %';
+    resultCell.textContent = '0.00%';
 
+    // Przycisk usuwania
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'row-remove';
+    removeBtn.setAttribute('aria-label', 'Usuń wiersz');
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      rowCount--;
+      updateAddButtonState();
+      computeTotal();
+    });
+
+    // Event listenery
     select.addEventListener('change', onRowChange);
+    
     if (qtyEl.tagName === 'SELECT') {
       qtyEl.addEventListener('change', onRowChange);
     } else {
       qtyEl.addEventListener('input', onRowChange);
-      dec.addEventListener('click', function(){
+      dec?.addEventListener('click', () => {
         const v = Math.max(0, (parseInt(qtyEl.value || '0', 10) || 0) - 1);
         qtyEl.value = String(v);
         onRowChange();
       });
-      inc.addEventListener('click', function(){
+      inc?.addEventListener('click', () => {
         const v = (parseInt(qtyEl.value || '0', 10) || 0) + 1;
         qtyEl.value = String(v);
         onRowChange();
       });
     }
 
+    // Złożenie wiersza
     row.appendChild(select);
     row.appendChild(qtyWrap);
     row.appendChild(resultCell);
+    row.appendChild(removeBtn);
     rowsContainer.appendChild(row);
 
-    rowCount += 1;
+    rowCount++;
     updateAddButtonState();
     computeTotal();
   }
 
+  /**
+   * Aktualizuje stan przycisku dodawania
+   */
   function updateAddButtonState() {
-    const btn = document.getElementById('add-row');
-    const hint = document.getElementById('row-hint');
+    const btn = $('add-row');
+    const hint = $('row-hint');
     const disabled = rowCount >= MAX_ROWS;
-    btn.disabled = disabled;
-    if (disabled) { hint.textContent = 'Max 10 rows reached'; }
-    else { hint.textContent = 'Up to 10 rows'; }
+    
+    if (btn) btn.disabled = disabled;
+    if (hint) {
+      hint.textContent = disabled 
+        ? 'Osiągnięto maksimum wierszy' 
+        : `Możesz dodać do ${MAX_ROWS} wierszy`;
+    }
   }
 
-  async function loadData() {
-    const res = await fetch('data/furniture.json');
-    if (!res.ok) throw new Error('Failed to load furniture data');
-    return res.json();
+  // ============================================
+  // PRZELICZNIK GODZIN
+  // ============================================
+
+  /**
+   * Oblicza konwersję procentu między normami
+   */
+  function calculateHoursConversion() {
+    const input = $('input-percent');
+    const fromSel = $('from-hours');
+    const toSel = $('to-hours');
+    const resultEl = $('hours-result');
+    const explanationEl = $('hours-explanation');
+
+    const value = parseFloat(input?.value);
+    
+    if (isNaN(value)) {
+      if (resultEl) resultEl.textContent = '—';
+      if (explanationEl) explanationEl.textContent = 'Wprowadź wartość procentową';
+      return;
+    }
+
+    const from = parseFloat(fromSel?.value) || 7;
+    const to = parseFloat(toSel?.value) || 7;
+    const result = value * (from / to);
+
+    if (resultEl) {
+      resultEl.textContent = `${format2(result)}%`;
+    }
+    
+    if (explanationEl) {
+      const fromFormatted = formatTime(from);
+      const toFormatted = formatTime(to);
+      explanationEl.textContent = `${format2(value)}% przy ${fromFormatted} = ${format2(result)}% przy ${toFormatted}`;
+    }
   }
 
-  document.addEventListener('DOMContentLoaded', async function () {
-    const addBtn = document.getElementById('add-row');
-    addBtn.addEventListener('click', addRow);
+  /**
+   * Inicjalizuje przelicznik godzin
+   */
+  function initHoursConverter() {
+    populateTimeSelects();
+
+    const calcBtn = $('calc-hours');
+    const inputEl = $('input-percent');
+    
+    // Ustaw domyślną wartość procentu
+    if (inputEl) {
+      inputEl.value = NormaConfig?.DEFAULT_CONVERTER?.PERCENT || 110;
+    }
+
+    calcBtn?.addEventListener('click', calculateHoursConversion);
+    inputEl?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') calculateHoursConversion();
+    });
+    inputEl?.addEventListener('input', calculateHoursConversion);
+  }
+
+  // ============================================
+  // KALKULATOR ZESPOŁOWY
+  // ============================================
+
+  /**
+   * Odświeża listę pracowników w kalkulatorze zespołowym
+   */
+  async function refreshTeamWorkersList() {
+    const container = $('team-workers-list');
+    if (!container) return;
 
     try {
-      furnitureMap = await loadData();
-      names = Object.keys(furnitureMap).sort((a, b) => a.localeCompare(b));
+      const workers = await WorkersManager.getActiveWorkers();
+      
+      container.innerHTML = '';
+      
+      for (const worker of workers) {
+        const item = document.createElement('label');
+        item.className = 'worker-checkbox';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'team-worker';
+        checkbox.value = worker.id;
+        checkbox.checked = true;
+        checkbox.dataset.name = worker.name;
+        checkbox.dataset.efficiency = worker.efficiency;
+        
+        const text = document.createElement('span');
+        text.innerHTML = `<strong>${worker.name}</strong> <span class="efficiency-badge">${worker.efficiency}%</span>`;
+        
+        item.appendChild(checkbox);
+        item.appendChild(text);
+        container.appendChild(item);
+      }
+    } catch (e) {
+      console.error('Błąd ładowania pracowników:', e);
+      container.innerHTML = '<p class="error-text">Nie można załadować pracowników</p>';
+    }
+  }
+
+  /**
+   * Dodaje nowy wiersz do kalkulatora zespołowego
+   */
+  function addTeamRow() {
+    if (teamRowCount >= MAX_ROWS) {
+      showToast('Osiągnięto maksymalną liczbę wierszy', 'error');
+      return;
+    }
+    
+    const rowsContainer = $('team-rows');
+    if (!rowsContainer) return;
+
+    const row = document.createElement('div');
+    row.className = 'team-row';
+
+    // Select mebla
+    const select = buildFurnitureSelect();
+    select.dataset.role = 'model';
+    
+    // Kontrolka ilości
+    const mobile = isMobileLike();
+    let qtyWrap, qtyEl, dec, inc;
+    
+    if (mobile) {
+      qtyEl = buildQtyControlMobile();
+      qtyWrap = qtyEl;
+    } else {
+      const desktop = buildQtyControlDesktop();
+      qtyWrap = desktop.wrap;
+      qtyEl = desktop.input;
+      dec = desktop.dec;
+      inc = desktop.inc;
+    }
+
+    // Komórka wyniku (opcjonalna - dla podglądu normy)
+    const resultCell = document.createElement('div');
+    resultCell.className = 'result-cell';
+    resultCell.textContent = '0.00%';
+
+    // Przycisk usuwania
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'team-row-remove';
+    removeBtn.setAttribute('aria-label', 'Usuń wiersz');
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      teamRowCount--;
+      updateTeamAddButtonState();
+      computeTeamTotal();
+    });
+
+    // Funkcja aktualizująca wynik wiersza
+    const onTeamRowChange = () => {
+      const name = select.value;
+      let val;
+      if (qtyEl.tagName === 'SELECT') {
+        val = parseInt(qtyEl.value, 10) || 0;
+      } else {
+        val = parseInt(qtyEl.value || '0', 10) || 0;
+      }
+      if (name && val > 0) {
+        const norm = furnitureMap[name] || 0;
+        resultCell.textContent = format2(norm * val) + '%';
+      } else {
+        resultCell.textContent = '0.00%';
+      }
+      computeTeamTotal();
+    };
+
+    // Event listenery
+    select.addEventListener('change', onTeamRowChange);
+    
+    if (qtyEl.tagName === 'SELECT') {
+      qtyEl.addEventListener('change', onTeamRowChange);
+    } else {
+      qtyEl.addEventListener('input', onTeamRowChange);
+      dec?.addEventListener('click', () => {
+        const v = Math.max(0, (parseInt(qtyEl.value || '0', 10) || 0) - 1);
+        qtyEl.value = String(v);
+        onTeamRowChange();
+      });
+      inc?.addEventListener('click', () => {
+        const v = (parseInt(qtyEl.value || '0', 10) || 0) + 1;
+        qtyEl.value = String(v);
+        onTeamRowChange();
+      });
+    }
+
+    // Złożenie wiersza
+    row.appendChild(select);
+    row.appendChild(qtyWrap);
+    row.appendChild(resultCell);
+    row.appendChild(removeBtn);
+    rowsContainer.appendChild(row);
+
+    teamRowCount++;
+    updateTeamAddButtonState();
+  }
+
+  /**
+   * Aktualizuje stan przycisku dodawania (team)
+   */
+  function updateTeamAddButtonState() {
+    const btn = $('add-team-row');
+    if (btn) btn.disabled = teamRowCount >= MAX_ROWS;
+  }
+
+  /**
+   * Oblicza sumę normy dla zespołu (preview)
+   */
+  function computeTeamTotal() {
+    const container = $('team-rows');
+    if (!container) return;
+
+    let total = 0;
+    const rows = container.querySelectorAll('.team-row');
+    
+    rows.forEach(row => {
+      const sel = row.querySelector('select');
+      const qtyEl = row.querySelector('select.qty-select, input[type="number"]');
+      const name = sel?.value;
+      let qty = 0;
+      
+      if (qtyEl?.tagName === 'SELECT') {
+        qty = parseInt(qtyEl.value, 10) || 0;
+      } else {
+        qty = parseInt(qtyEl?.value || '0', 10) || 0;
+      }
+      
+      if (name && qty > 0) {
+        total += (furnitureMap[name] || 0) * qty;
+      }
+    });
+
+    // Opcjonalnie: można wyświetlić sumę gdzieś
+    // Nie ma teraz dedykowanego elementu na sumę
+  }
+
+  /**
+   * Zbiera dane z wierszy zespołowych
+   */
+  function collectTeamFurnitureData() {
+    const container = $('team-rows');
+    if (!container) return [];
+
+    const items = [];
+    const rows = container.querySelectorAll('.team-row');
+    
+    rows.forEach(row => {
+      const sel = row.querySelector('select');
+      const qtyEl = row.querySelector('select.qty-select, input[type="number"]');
+      const name = sel?.value;
+      let qty = 0;
+      
+      if (qtyEl?.tagName === 'SELECT') {
+        qty = parseInt(qtyEl.value, 10) || 0;
+      } else {
+        qty = parseInt(qtyEl?.value || '0', 10) || 0;
+      }
+      
+      if (name && qty > 0) {
+        items.push({
+          name: name,
+          norm: furnitureMap[name] || 0,
+          quantity: qty
+        });
+      }
+    });
+
+    return items;
+  }
+
+  /**
+   * Oblicza podział pracy w zespole
+   */
+  function calculateTeamDistribution() {
+    const resultsContainer = $('team-results');
+    const distributionContainer = $('team-distribution');
+    const summaryContainer = $('team-summary');
+
+    // Zbierz dane z wierszy
+    const furnitureItems = collectTeamFurnitureData();
+
+    if (furnitureItems.length === 0) {
+      showToast('Dodaj przynajmniej jeden mebel', 'error');
+      return;
+    }
+
+    // Oblicz łączną normę
+    let totalNorm = 0;
+    let totalQuantity = 0;
+    furnitureItems.forEach(item => {
+      totalNorm += item.norm * item.quantity;
+      totalQuantity += item.quantity;
+    });
+
+    // Pobierz zaznaczonych pracowników
+    const checkboxes = document.querySelectorAll('input[name="team-worker"]:checked');
+    const selectedWorkers = Array.from(checkboxes).map(cb => ({
+      id: cb.value,
+      name: cb.dataset.name,
+      efficiency: parseInt(cb.dataset.efficiency),
+      active: true
+    }));
+
+    if (selectedWorkers.length === 0) {
+      showToast('Wybierz przynajmniej jednego pracownika', 'error');
+      return;
+    }
+
+    // Oblicz proporcjonalny podział normy według wydajności
+    const totalEfficiency = selectedWorkers.reduce((sum, w) => sum + w.efficiency, 0);
+    
+    const distribution = selectedWorkers.map(worker => {
+      const share = worker.efficiency / totalEfficiency;
+      const assignedNorm = totalNorm * share;
+      return {
+        name: worker.name,
+        efficiency: worker.efficiency,
+        assignedNorm: assignedNorm,
+        percentOfTotal: Math.round(share * 100),
+        basePercent: format2(assignedNorm)
+      };
+    });
+
+    // Przypisz meble do pracowników proporcjonalnie
+    const workerAssignments = distribution.map(w => ({
+      ...w,
+      furniture: [],
+      totalAssignedNorm: 0,
+      totalAssignedQty: 0
+    }));
+    
+    // Rozdziel meble między pracowników według ich udziału
+    for (const item of furnitureItems) {
+      // Oblicz ile sztuk przypada na każdego pracownika
+      let remainingQty = item.quantity;
+      
+      for (let i = 0; i < workerAssignments.length; i++) {
+        const worker = workerAssignments[i];
+        const workerShare = worker.percentOfTotal / 100;
+        
+        // Dla ostatniego pracownika - reszta
+        let assignedQty;
+        if (i === workerAssignments.length - 1) {
+          assignedQty = remainingQty;
+        } else {
+          assignedQty = Math.round(item.quantity * workerShare);
+          remainingQty -= assignedQty;
+        }
+        
+        if (assignedQty > 0) {
+          const assignedNorm = item.norm * assignedQty;
+          worker.furniture.push({
+            name: item.name,
+            quantity: assignedQty,
+            norm: item.norm,
+            assignedNorm: assignedNorm
+          });
+          worker.totalAssignedNorm += assignedNorm;
+          worker.totalAssignedQty += assignedQty;
+        }
+      }
+    }
+
+    // Wyświetl wyniki
+    resultsContainer?.classList.remove('hidden');
+    
+    // Generuj karty pracowników z przypisanymi meblami
+    if (distributionContainer) {
+      distributionContainer.innerHTML = '';
+      
+      for (const worker of workerAssignments) {
+        const furnitureListHtml = worker.furniture.map(f => 
+          `<div class="furniture-item">
+            <span class="furniture-name">${f.name}</span>
+            <span class="furniture-qty">${f.quantity} szt.</span>
+            <span class="furniture-percent">${format2(f.assignedNorm)}%</span>
+          </div>`
+        ).join('');
+        
+        const card = document.createElement('div');
+        card.className = 'worker-card';
+        card.innerHTML = `
+          <div class="worker-card-header">
+            <span class="worker-name">${worker.name}</span>
+            <span class="worker-efficiency">${worker.efficiency}%</span>
+          </div>
+          <div class="worker-card-body">
+            <div class="stat-row">
+              <div class="stat">
+                <span class="stat-label">Sztuk</span>
+                <span class="stat-value">${worker.totalAssignedQty}</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Norma</span>
+                <span class="stat-value">${format2(worker.totalAssignedNorm)}%</span>
+              </div>
+            </div>
+            <div class="furniture-list">
+              ${furnitureListHtml}
+            </div>
+          </div>
+        `;
+        distributionContainer.appendChild(card);
+      }
+    }
+
+    // Podsumowanie z listą mebli
+    if (summaryContainer) {
+      const furnitureList = furnitureItems.map(item => 
+        `${item.name} × ${item.quantity} (${format2(item.norm * item.quantity)}%)`
+      ).join('<br>');
+
+      summaryContainer.innerHTML = `
+        <div class="summary-row">
+          <span>Suma normy:</span>
+          <strong>${format2(totalNorm)}%</strong>
+        </div>
+        <div class="summary-row">
+          <span>Łączna ilość:</span>
+          <strong>${totalQuantity} szt.</strong>
+        </div>
+        <div class="summary-furniture">
+          <span class="summary-furniture-label">Meble do wykonania:</span>
+          <div class="summary-furniture-list">${furnitureList}</div>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Inicjalizuje kalkulator zespołowy
+   */
+  function initTeamCalculator() {
+    const calcBtn = $('calc-team');
+    const addBtn = $('add-team-row');
+    
+    calcBtn?.addEventListener('click', calculateTeamDistribution);
+    addBtn?.addEventListener('click', addTeamRow);
+    
+    // NIE dodawaj wiersza tutaj - dane nie są jeszcze załadowane
+    // Wiersz zostanie dodany po załadowaniu danych w initApp
+  }
+
+  // ============================================
+  // ZARZĄDZANIE PRACOWNIKAMI
+  // ============================================
+
+  /**
+   * Odświeża listę pracowników w panelu zarządzania
+   */
+  async function refreshWorkersList() {
+    const container = $('workers-list');
+    if (!container) return;
+
+    try {
+      const workers = await WorkersManager.getAllWorkers();
+      
+      container.innerHTML = '';
+      
+      if (workers.length === 0) {
+        container.innerHTML = '<p class="empty-text">Brak pracowników. Dodaj pierwszego poniżej.</p>';
+        return;
+      }
+      
+      for (const worker of workers) {
+        if (worker.active === false) continue; // Ukryj usuniętych
+        
+        const card = document.createElement('div');
+        card.className = 'worker-edit-card';
+        card.dataset.workerId = worker.id;
+        
+        card.innerHTML = `
+          <div class="worker-info">
+            <span class="worker-name-display">${worker.name}</span>
+            <span class="worker-position">${worker.position || 'Klejarz'}</span>
+          </div>
+          <div class="worker-efficiency-display">
+            <span class="efficiency-value">${worker.efficiency}%</span>
+          </div>
+          <div class="worker-actions">
+            <button type="button" class="btn-icon edit-worker" data-tooltip="Edytuj" aria-label="Edytuj pracownika">✏️</button>
+            <button type="button" class="btn-icon delete-worker" data-tooltip="Usuń" aria-label="Usuń pracownika">🗑️</button>
+          </div>
+        `;
+        
+        // Event listenery
+        card.querySelector('.edit-worker')?.addEventListener('click', () => editWorker(worker.id));
+        card.querySelector('.delete-worker')?.addEventListener('click', () => deleteWorker(worker.id, worker.name));
+        
+        container.appendChild(card);
+      }
+    } catch (e) {
+      console.error('Błąd ładowania pracowników:', e);
+      container.innerHTML = '<p class="error-text">Nie można załadować pracowników</p>';
+    }
+  }
+
+  /**
+   * Edytuje pracownika (inline)
+   * @param {string} workerId - ID pracownika
+   */
+  async function editWorker(workerId) {
+    const worker = await WorkersManager.getWorkerById(workerId);
+    if (!worker) return;
+
+    const card = document.querySelector(`[data-worker-id="${workerId}"]`);
+    if (!card) return;
+
+    // Zamień na formularz edycji
+    card.innerHTML = `
+      <div class="edit-form">
+        <input type="text" class="edit-name" value="${worker.name}" placeholder="Imię" />
+        <input type="number" class="edit-efficiency" value="${worker.efficiency}" min="1" max="300" placeholder="%" />
+        <input type="text" class="edit-position" value="${worker.position || ''}" placeholder="Stanowisko" />
+      </div>
+      <div class="worker-actions">
+        <button type="button" class="btn-icon save-worker" data-tooltip="Zapisz" aria-label="Zapisz">✅</button>
+        <button type="button" class="btn-icon cancel-edit" data-tooltip="Anuluj" aria-label="Anuluj">❌</button>
+      </div>
+    `;
+
+    card.querySelector('.save-worker')?.addEventListener('click', async () => {
+      const name = card.querySelector('.edit-name')?.value.trim();
+      const efficiency = parseInt(card.querySelector('.edit-efficiency')?.value);
+      const position = card.querySelector('.edit-position')?.value.trim();
+
+      if (!name) {
+        showToast('Imię jest wymagane', 'error');
+        return;
+      }
+
+      await WorkersManager.updateWorker(workerId, { name, efficiency, position });
+      showToast('Pracownik zaktualizowany', 'success');
+      refreshWorkersList();
+    });
+
+    card.querySelector('.cancel-edit')?.addEventListener('click', () => {
+      refreshWorkersList();
+    });
+  }
+
+  /**
+   * Usuwa pracownika
+   * @param {string} workerId - ID pracownika
+   * @param {string} name - Imię (do potwierdzenia)
+   */
+  async function deleteWorker(workerId, name) {
+    if (!confirm(`Czy na pewno chcesz usunąć pracownika "${name}"?`)) return;
+
+    await WorkersManager.removeWorker(workerId);
+    showToast(`Pracownik "${name}" został usunięty`, 'success');
+    refreshWorkersList();
+    refreshTeamWorkersList();
+  }
+
+  /**
+   * Inicjalizuje panel zarządzania pracownikami
+   */
+  function initWorkersPanel() {
+    // Formularz dodawania
+    const addForm = $('add-worker-form');
+    addForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = $('new-worker-name')?.value.trim();
+      const efficiency = parseInt($('new-worker-efficiency')?.value) || 100;
+      const position = $('new-worker-position')?.value.trim();
+
+      if (!name) {
+        showToast('Imię jest wymagane', 'error');
+        return;
+      }
+
+      await WorkersManager.addWorker({ name, efficiency, position });
+      showToast(`Dodano pracownika "${name}"`, 'success');
+      
+      // Reset formularza
+      addForm.reset();
+      refreshWorkersList();
+      refreshTeamWorkersList();
+    });
+
+    // Eksport
+    $('export-workers')?.addEventListener('click', async () => {
+      const json = await WorkersManager.exportToJson();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'normapro-pracownicy.json';
+      a.click();
+      
+      URL.revokeObjectURL(url);
+      showToast('Dane wyeksportowane', 'success');
+    });
+
+    // Import
+    $('import-workers')?.addEventListener('click', () => {
+      $('import-file')?.click();
+    });
+
+    $('import-file')?.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const success = WorkersManager.importFromJson(text);
+        
+        if (success) {
+          showToast('Dane zaimportowane', 'success');
+          refreshWorkersList();
+          refreshTeamWorkersList();
+        } else {
+          showToast('Błąd importu - nieprawidłowy format', 'error');
+        }
+      } catch (err) {
+        showToast('Błąd odczytu pliku', 'error');
+      }
+      
+      e.target.value = '';
+    });
+
+    // Reset
+    $('reset-workers')?.addEventListener('click', async () => {
+      if (!confirm('Czy na pewno chcesz przywrócić domyślną listę pracowników?')) return;
+      
+      await WorkersManager.resetToDefault();
+      showToast('Przywrócono domyślnych pracowników', 'success');
+      refreshWorkersList();
+      refreshTeamWorkersList();
+    });
+  }
+
+  // ============================================
+  // ZARZĄDZANIE NORMĄ BAZOWĄ
+  // ============================================
+
+  /**
+   * Aktualizuje wyświetlanie aktualnej normy
+   */
+  function updateNormDisplay() {
+    const displayEl = $('current-norm-display');
+    const footerEl = $('footer-norm');
+    
+    if (displayEl) displayEl.textContent = `${currentNormHours} godzin`;
+    if (footerEl) footerEl.textContent = `${currentNormHours}h`;
+  }
+
+  /**
+   * Inicjalizuje modal zmiany normy
+   */
+  function initNormModal() {
+    const modal = $('norm-modal');
+    const changeBtn = $('change-norm-btn');
+    const cancelBtn = $('norm-modal-cancel');
+    const saveBtn = $('norm-modal-save');
+    const normInput = $('norm-hours-input');
+
+    changeBtn?.addEventListener('click', () => {
+      populateNormSelect();
+      modal?.classList.remove('hidden');
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+      modal?.classList.add('hidden');
+    });
+
+    saveBtn?.addEventListener('click', () => {
+      currentNormHours = parseInt(normInput?.value) || 7;
+      updateNormDisplay();
+      computeTotal();
+      modal?.classList.add('hidden');
+      showToast(`Norma zmieniona na ${currentNormHours}h`, 'success');
+      
+      // Zapisz do localStorage
+      localStorage.setItem('normapro_norm_hours', currentNormHours);
+    });
+
+    // Kliknięcie poza modalem zamyka go
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+      }
+    });
+
+    // Wczytaj zapisaną normę
+    const savedNorm = localStorage.getItem('normapro_norm_hours');
+    if (savedNorm) {
+      currentNormHours = parseInt(savedNorm) || 7;
+      updateNormDisplay();
+    }
+  }
+
+  // ============================================
+  // DANE MEBLI (WBUDOWANE)
+  // ============================================
+
+  /**
+   * Wbudowane dane mebli - działa bez serwera
+   */
+  const FURNITURE_DATA = {
+    "Azuro": 4.5,
+    "Roma": 4.125,
+    "Lizbona": 2.96,
+    "Stavia": 3.9,
+    "Karisa": 3,
+    "Atlantic": 5.33,
+    "Cocoli": 6,
+    "Trivento": 8.6,
+    "Flavia": 6.75,
+    "Veni": 5.54,
+    "Verde szelong M": 3.58,
+    "Verde siedz. 1-os": 2.3,
+    "Verde siedz. róg": 3.15,
+    "Verde siedz. 2.5-os": 3.35,
+    "Verde Sofa 2.5-os": 5.35,
+    "Verde Set-3": 7.93,
+    "Verde pufa": 1.4125,
+    "Colette Set-2": 10.5,
+    "Colette Set-4": 14.36,
+    "Espada Set-2": 8.57,
+    "Mega kanapa": 4.8,
+    "Espada pufa": 1.4,
+    "Espada Sofa 2.5-os": 6,
+    "Espada siedz. 2.5-os + Bok": 4.8,
+    "Espada siedz. 1-os + Bok": 4,
+    "Porto nar. bez boków": 4.133,
+    "Porto nar.": 6.26,
+    "Ariola nar.": 6.77,
+    "Besalu": 4.1,
+    "Nola": 3.6,
+    "Dali Set-2": 8.6,
+    "Carlo U": 14.4,
+    "Marsylia": 6.525,
+    "Segre": 5.12,
+    "Espada Set-4": 11.4,
+    "Noko": 5.5
+  };
+
+  /**
+   * Ładuje dane mebli (wbudowane lub z JSON jako fallback)
+   * @returns {Promise<Object>}
+   */
+  async function loadFurnitureData() {
+    // Najpierw użyj wbudowanych danych
+    if (Object.keys(FURNITURE_DATA).length > 0) {
+      return FURNITURE_DATA;
+    }
+    // Fallback do JSON (jeśli serwer dostępny)
+    try {
+      const res = await fetch('data/furniture.json');
+      if (res.ok) return res.json();
+    } catch (e) {
+      console.log('Używam wbudowanych danych mebli');
+    }
+    return FURNITURE_DATA;
+  }
+
+  // ============================================
+  // INICJALIZACJA APLIKACJI
+  // ============================================
+
+  document.addEventListener('DOMContentLoaded', async function () {
+    // Inicjalizuj nawigację
+    initViewNavigation();
+    
+    // Inicjalizuj modal normy
+    initNormModal();
+    
+    // Inicjalizuj przelicznik godzin
+    initHoursConverter();
+    
+    // Inicjalizuj panel pracowników
+    initWorkersPanel();
+    
+    // Inicjalizuj kalkulator zespołowy
+    initTeamCalculator();
+
+    // Przycisk dodawania wiersza
+    const addBtn = $('add-row');
+    addBtn?.addEventListener('click', addRow);
+
+    // Aktualizuj wyświetlanie normy
+    updateNormDisplay();
+
+    try {
+      // Załaduj dane mebli (wbudowane - działa bez serwera)
+      furnitureMap = await loadFurnitureData();
+      furnitureNames = Object.keys(furnitureMap).sort((a, b) => a.localeCompare(b, 'pl'));
+      
+      // Dodaj pierwszy wiersz do głównego kalkulatora
       addRow();
+      
+      // Dodaj pierwszy wiersz do kalkulatora zespołowego
+      addTeamRow();
+      
+      // Załaduj pracowników
+      await WorkersManager.loadWorkers();
+      
     } catch (err) {
-      const rows = document.getElementById('rows');
-      const warn = document.createElement('div');
-      warn.className = 'result-cell';
-      warn.textContent = 'Unable to load data. Please run via a local server.';
-      rows.appendChild(warn);
-      console.error(err);
+      console.error('Błąd inicjalizacji:', err);
+      // Nawet przy błędzie, spróbuj użyć wbudowanych danych
+      if (Object.keys(furnitureMap).length === 0) {
+        furnitureMap = FURNITURE_DATA;
+        furnitureNames = Object.keys(furnitureMap).sort((a, b) => a.localeCompare(b, 'pl'));
+        addRow();
+        addTeamRow();
+      }
     }
   });
 
-  window.NormaCalculator = { addRow };
+  // Eksport globalny (dla debugowania)
+  window.NormaPro = {
+    addRow,
+    computeTotal,
+    switchView,
+    getConfig: () => ({ currentNormHours, rowCount, furnitureNames })
+  };
+
 })();

@@ -1,129 +1,293 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="pl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Norma Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <meta name="description" content="NormaPro - Kalkulator normy produkcyjnej dla mebli tapicerowanych. Oblicz procenty, podziel pracę w zespole." />
+  <meta name="theme-color" content="#111111" />
+  <title>NormaPro - Kalkulator Normy</title>
   <link rel="stylesheet" href="css/style.css" />
+  
+  <!-- Preload czcionek -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 <body>
   <main class="container">
-    <h1>Norma Calculator</h1>
-    <p class="subtitle">Calculate total % for selected furniture models.</p>
+    <!-- Nagłówek aplikacji -->
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">📊</span>
+        <h1>NormaPro</h1>
+      </div>
+      <p class="subtitle">Kalkulator normy produkcyjnej dla mebli tapicerowanych</p>
+    </header>
 
-    <div class="view-toggle" style="display:flex;gap:8px;margin:14px 0 4px 0;">
-      <button type="button" id="view-norma" class="btn-toggle" aria-pressed="true">Norma</button>
-      <button type="button" id="view-hours" class="btn-toggle" aria-pressed="false">6h ↔ 8h</button>
-    </div>
+    <!-- Nawigacja między widokami -->
+    <nav class="view-toggle" role="tablist" aria-label="Wybór widoku">
+      <button type="button" id="view-norma" class="btn-toggle active" role="tab" aria-selected="true" aria-controls="norma-section" data-tooltip="Oblicz procenty dla wybranych mebli">
+        <span class="btn-icon">🧮</span>
+        <span class="btn-text">Kalkulator</span>
+      </button>
+      <button type="button" id="view-hours" class="btn-toggle" role="tab" aria-selected="false" aria-controls="hours-section" data-tooltip="Przelicz procenty między różnymi normami czasowymi">
+        <span class="btn-icon">⏱️</span>
+        <span class="btn-text">Przelicznik</span>
+      </button>
+      <button type="button" id="view-team" class="btn-toggle" role="tab" aria-selected="false" aria-controls="team-section" data-tooltip="Podziel pracę między członków zespołu">
+        <span class="btn-icon">👥</span>
+        <span class="btn-text">Zespół</span>
+      </button>
+      <button type="button" id="view-workers" class="btn-toggle" role="tab" aria-selected="false" aria-controls="workers-section" data-tooltip="Zarządzaj listą pracowników">
+        <span class="btn-icon">⚙️</span>
+        <span class="btn-text">Pracownicy</span>
+      </button>
+    </nav>
 
-    <section class="rows" id="rows" aria-live="polite">
-      <!-- Rows are added dynamically after data loads -->
+    <!-- ============================================ -->
+    <!-- SEKCJA 1: Kalkulator Normy -->
+    <!-- ============================================ -->
+    <section id="norma-section" class="view-section active" role="tabpanel" aria-labelledby="view-norma">
+      <div class="section-header">
+        <h2>Kalkulator Normy</h2>
+        <p class="section-desc">Wybierz meble i ilości, aby obliczyć łączny procent normy.</p>
+      </div>
+
+      <!-- Lista wierszy kalkulatora -->
+      <div class="calculator-rows" id="rows" aria-live="polite" aria-label="Lista mebli do obliczenia">
+        <!-- Wiersze dodawane dynamicznie przez JS -->
+      </div>
+
+      <!-- Kontrolki -->
+      <div class="controls">
+        <button type="button" id="add-row" class="btn-primary" aria-label="Dodaj nowy wiersz">
+          <span>+</span> Dodaj wiersz
+        </button>
+        <span class="hint" id="row-hint">Możesz dodać do 20 wierszy</span>
+      </div>
+
+      <!-- Podsumowanie -->
+      <div class="summary-card">
+        <div class="summary-header">
+          <span class="summary-label">Suma normy</span>
+          <span class="summary-info" data-tooltip="Łączny procent normy dla wszystkich wybranych mebli">ⓘ</span>
+        </div>
+        <div class="summary-value">
+          <span id="total">0.00</span><span class="unit">%</span>
+        </div>
+      </div>
     </section>
 
-    <!-- Hours converter (hidden by default) -->
-    <section id="hours-converter" style="display:none;margin-top:12px;">
-      <form id="hours-form" onsubmit="return false;" style="display:flex;flex-direction:column;gap:10px;">
-        <div style="display:flex;gap:10px;align-items:center;">
-          <label for="input-percent" style="min-width:110px;color:var(--muted);">Input percentage</label>
-          <input id="input-percent" type="number" min="0" step="0.01" placeholder="e.g. 75" style="flex:1;" />
+    <!-- ============================================ -->
+    <!-- SEKCJA 2: Przelicznik Godzin -->
+    <!-- ============================================ -->
+    <section id="hours-section" class="view-section" role="tabpanel" aria-labelledby="view-hours" hidden>
+      <div class="section-header">
+        <h2>Przelicznik Godzin</h2>
+        <p class="section-desc">Przelicz procent normy między różnymi czasami pracy.</p>
+      </div>
+
+      <form id="hours-form" class="converter-form" onsubmit="return false;">
+        <!-- Input procentu -->
+        <div class="field">
+          <label for="input-percent">
+            Procent do przeliczenia
+            <span class="field-hint" data-tooltip="Wpisz wartość procentową, którą chcesz przeliczyć">ⓘ</span>
+          </label>
+          <div class="input-with-unit">
+            <input 
+              id="input-percent" 
+              type="number" 
+              min="0" 
+              step="0.01" 
+              placeholder="np. 75" 
+              inputmode="decimal"
+              autocomplete="off"
+            />
+            <span class="unit-label">%</span>
+          </div>
         </div>
 
-        <div style="display:flex;gap:10px;align-items:center;">
-          <label style="min-width:110px;color:var(--muted);">From → To</label>
-          <div style="flex:1;display:flex;gap:8px;align-items:center;">
-            <select id="from-hours" aria-label="From hours" style="width:88px;">
-              <!-- options added in JS fallback to 6 -->
+        <!-- Wybór godzin źródłowych i docelowych -->
+        <div class="converter-row">
+          <div class="field flex-1">
+            <label for="from-hours">
+              Z normy
+              <span class="field-hint" data-tooltip="Źródłowa norma godzinowa">ⓘ</span>
+            </label>
+            <select id="from-hours" aria-label="Źródłowa norma godzinowa">
+              <!-- Opcje generowane przez JS -->
             </select>
-            <div style="color:var(--muted);">→</div>
-            <select id="to-hours" aria-label="To hours" style="width:88px;">
-              <!-- options added in JS fallback to 8 -->
+          </div>
+
+          <div class="converter-arrow" aria-hidden="true">
+            <span>→</span>
+          </div>
+
+          <div class="field flex-1">
+            <label for="to-hours">
+              Na normę
+              <span class="field-hint" data-tooltip="Docelowa norma godzinowa">ⓘ</span>
+            </label>
+            <select id="to-hours" aria-label="Docelowa norma godzinowa">
+              <!-- Opcje generowane przez JS -->
             </select>
           </div>
         </div>
 
-        <div style="display:flex;gap:10px;align-items:center;">
-          <button id="calc-hours" type="button">Calculate</button>
-          <div id="hours-result" style="color:var(--text);font-weight:600;">Result: —</div>
+        <!-- Przycisk oblicz -->
+        <button id="calc-hours" type="button" class="btn-primary btn-full">
+          Oblicz
+        </button>
+
+        <!-- Wynik -->
+        <div class="result-card" id="hours-result-card">
+          <div class="result-label">Wynik przeliczenia</div>
+          <div class="result-value" id="hours-result">—</div>
+          <div class="result-explanation" id="hours-explanation"></div>
         </div>
       </form>
     </section>
 
-    <div class="controls">
-      <button type="button" id="add-row" aria-label="Add row">+ Add Row</button>
-      <span class="hint" id="row-hint">Up to 20 rows</span>
-    </div>
+    <!-- ============================================ -->
+    <!-- SEKCJA 3: Kalkulator Zespołowy -->
+    <!-- ============================================ -->
+    <section id="team-section" class="view-section" role="tabpanel" aria-labelledby="view-team" hidden>
+      <div class="section-header">
+        <h2>Kalkulator Zespołowy</h2>
+        <p class="section-desc">Podziel pracę proporcjonalnie według wydajności pracowników.</p>
+      </div>
 
-    <section class="summary" aria-live="polite">
-      <div class="total-label">TOTAL %</div>
-      <div class="total-value"><span id="total">0.00</span>%</div>
+      <!-- Lista mebli zespołowych -->
+      <div class="team-furniture-rows" id="team-rows">
+        <!-- Wiersze generowane przez JS -->
+      </div>
+
+      <!-- Kontrolki dodawania mebli -->
+      <div class="controls">
+        <button type="button" id="add-team-row" class="btn-primary">
+          <span>+</span> Dodaj mebel
+        </button>
+      </div>
+
+      <!-- Wybór pracowników -->
+      <div class="field" style="margin-top: var(--space-lg);">
+        <label>
+          Członkowie zespołu
+          <span class="field-hint" data-tooltip="Zaznacz pracowników biorących udział w zadaniu">ⓘ</span>
+        </label>
+        <div id="team-workers-list" class="workers-checklist">
+          <!-- Generowane przez JS -->
+        </div>
+      </div>
+
+      <!-- Przycisk oblicz -->
+      <button id="calc-team" type="button" class="btn-primary btn-full" style="margin-top: var(--space-lg);">
+        Oblicz podział
+      </button>
+
+      <!-- Wyniki podziału -->
+      <div id="team-results" class="team-results hidden">
+        <h3>Podział pracy</h3>
+        <div id="team-distribution" class="distribution-grid">
+          <!-- Generowane przez JS -->
+        </div>
+        <div class="team-summary" id="team-summary">
+          <!-- Podsumowanie generowane przez JS -->
+        </div>
+      </div>
     </section>
+
+    <!-- ============================================ -->
+    <!-- SEKCJA 4: Zarządzanie Pracownikami -->
+    <!-- ============================================ -->
+    <section id="workers-section" class="view-section" role="tabpanel" aria-labelledby="view-workers" hidden>
+      <div class="section-header">
+        <h2>Zarządzanie Pracownikami</h2>
+        <p class="section-desc">Dodawaj, edytuj i usuwaj klejarzy oraz ich wydajność.</p>
+      </div>
+
+      <!-- Lista pracowników -->
+      <div id="workers-list" class="workers-list">
+        <!-- Generowane przez JS -->
+      </div>
+
+      <!-- Formularz dodawania -->
+      <div class="add-worker-form">
+        <h3>Dodaj pracownika</h3>
+        <form id="add-worker-form" onsubmit="return false;">
+          <div class="form-row">
+            <div class="field flex-2">
+              <label for="new-worker-name">Imię</label>
+              <input 
+                id="new-worker-name" 
+                type="text" 
+                placeholder="np. Jan" 
+                required
+                autocomplete="off"
+              />
+            </div>
+            <div class="field flex-1">
+              <label for="new-worker-efficiency">
+                Wydajność
+                <span class="field-hint" data-tooltip="Procent wydajności względem normy (100% = norma)">ⓘ</span>
+              </label>
+              <div class="input-with-unit">
+                <input 
+                  id="new-worker-efficiency" 
+                  type="number" 
+                  min="1" 
+                  max="300" 
+                  step="1" 
+                  placeholder="100" 
+                  required
+                  inputmode="numeric"
+                />
+                <span class="unit-label">%</span>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="new-worker-position">Stanowisko (opcjonalnie)</label>
+            <input 
+              id="new-worker-position" 
+              type="text" 
+              placeholder="np. Klejarz Senior"
+              autocomplete="off"
+            />
+          </div>
+          <button type="submit" class="btn-primary btn-full">
+            <span>+</span> Dodaj pracownika
+          </button>
+        </form>
+      </div>
+
+      <!-- Akcje -->
+      <div class="workers-actions">
+        <button type="button" id="export-workers" class="btn-secondary" data-tooltip="Eksportuj dane pracowników do pliku JSON">
+          📥 Eksportuj
+        </button>
+        <button type="button" id="import-workers" class="btn-secondary" data-tooltip="Importuj dane pracowników z pliku JSON">
+          📤 Importuj
+        </button>
+        <button type="button" id="reset-workers" class="btn-danger" data-tooltip="Przywróć domyślną listę pracowników">
+          🔄 Resetuj
+        </button>
+      </div>
+
+      <!-- Ukryty input do importu -->
+      <input type="file" id="import-file" accept=".json" style="display:none" />
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>NormaPro v2.0</p>
+    </footer>
   </main>
 
-  <script src="js/calculator.js" defer></script>
-  <script>
-    // View toggle logic and embedded hours converter (single-file as requested)
-    (function(){
-      function $(id){return document.getElementById(id);}
-      const normaBtn = $('view-norma');
-      const hoursBtn = $('view-hours');
-      const rows = $('rows');
-      const controls = document.querySelector('.controls');
-      const summary = document.querySelector('.summary');
-      const hoursSection = $('hours-converter');
-
-      function showView(v){
-        if(v==='norma'){
-          rows.style.display = '';
-          controls.style.display = '';
-          summary.style.display = '';
-          hoursSection.style.display = 'none';
-          normaBtn.setAttribute('aria-pressed','true');
-          hoursBtn.setAttribute('aria-pressed','false');
-        } else {
-          rows.style.display = 'none';
-          controls.style.display = 'none';
-          summary.style.display = 'none';
-          hoursSection.style.display = '';
-          normaBtn.setAttribute('aria-pressed','false');
-          hoursBtn.setAttribute('aria-pressed','true');
-        }
-      }
-
-      normaBtn.addEventListener('click', ()=> showView('norma'));
-      hoursBtn.addEventListener('click', ()=> showView('hours'));
-
-      // Hours converter
-      const input = $('input-percent');
-      const fromSel = $('from-hours');
-      const toSel = $('to-hours');
-      const calc = $('calc-hours');
-      const result = $('hours-result');
-
-      // populate hours selects 1..10
-      for (let h = 1; h <= 10; h++){
-        const o1 = document.createElement('option'); o1.value = String(h); o1.textContent = `${h} h`;
-        const o2 = document.createElement('option'); o2.value = String(h); o2.textContent = `${h} h`;
-        fromSel.appendChild(o1); toSel.appendChild(o2);
-      }
-      // sensible defaults
-      fromSel.value = '6';
-      toSel.value = '8';
-
-      function calcHours(){
-        const v = parseFloat(input.value);
-        if(isNaN(v)) { result.textContent = 'Result: —'; return; }
-        const from = parseFloat(fromSel.value) || 6;
-        const to = parseFloat(toSel.value) || 8;
-        const out = v * (from / to);
-        result.textContent = `Result: ${out.toFixed(2)}%`;
-      }
-
-      calc.addEventListener('click', calcHours);
-      input.addEventListener('keydown', function(e){ if(e.key === 'Enter') calcHours(); });
-
-      // start on norma view
-      showView('norma');
-    })();
-  </script>
+  <!-- Ładowanie skryptów -->
+  <script src="js/config.js"></script>
+  <script src="js/workers.js"></script>
+  <script src="js/team-calculator.js"></script>
+  <script src="js/calculator.js"></script>
 </body>
 </html>

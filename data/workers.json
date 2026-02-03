@@ -1,0 +1,25 @@
+{
+  "workers": [
+    {
+      "id": "worker_1",
+      "name": "Ja",
+      "efficiency": 110,
+      "position": "Klejarz",
+      "active": true,
+      "createdAt": "2026-02-03T00:00:00.000Z"
+    },
+    {
+      "id": "worker_2",
+      "name": "Maciek",
+      "efficiency": 140,
+      "position": "Klejarz Senior",
+      "active": true,
+      "createdAt": "2026-02-03T00:00:00.000Z"
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "lastUpdated": "2026-02-03T00:00:00.000Z",
+    "description": "Dataset pracowników (klejarzy) z ich wydajnością procentową"
+  }
+}
