@@ -21,7 +21,7 @@ const WorkersManager = (function() {
   const DEFAULT_WORKERS = [
     {
       id: 'worker_1',
-      name: 'Ja',
+      name: 'Dawid',
       efficiency: 110,
       position: 'Klejarz',
       active: true,

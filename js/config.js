@@ -22,6 +22,63 @@ const NormaConfig = {
   DEFAULT_NORM_HOURS: 7,
 
   /**
+   * ============================================
+   * USTAWIENIA ZMIAN ROBOCZYCH
+   * ============================================
+   */
+  
+  /**
+   * Harmonogram zmian - co tydzień zmienia się zmiana
+   * 
+   * Harmonogram:
+   * 02.02.2026 - 08.02.2026 = Druga zmiana (tydzień 0)
+   * 09.02.2026 - 15.02.2026 = Pierwsza zmiana (tydzień 1)  
+   * 16.02.2026 - 22.02.2026 = Druga zmiana (tydzień 2)
+   * 23.02.2026 - 01.03.2026 = Pierwsza zmiana (tydzień 3)
+   * I tak dalej...
+   */
+  SHIFT_SCHEDULE: {
+    // Data początkowa drugiej zmiany (02.02.2026 - poniedziałek)
+    SECOND_SHIFT_START: '2026-02-02',
+    // Co ile tygodni zmienia się zmiana
+    SHIFT_CYCLE_WEEKS: 1
+  },
+
+  /**
+   * Bloki czasowe dla pierwszej zmiany
+   * 6:00 - 10:00 praca, 10:00 - 10:20 przerwa, 10:20 - 13:30 praca
+   */
+  FIRST_SHIFT: {
+    name: 'Pierwsza zmiana',
+    start: '06:00',
+    end: '13:30',
+    blocks: [
+      { type: 'work', start: '06:00', end: '10:00', label: 'Praca' },
+      { type: 'break', start: '10:00', end: '10:20', label: 'Przerwa' },
+      { type: 'work', start: '10:20', end: '13:30', label: 'Praca' }
+    ],
+    // Całkowity czas pracy w minutach: 4h + 3h10min = 430min = 7h10min
+    totalWorkMinutes: 430
+  },
+
+  /**
+   * Bloki czasowe dla drugiej zmiany
+   * 14:00 - 18:00 praca, 18:00 - 18:20 przerwa, 18:20 - 21:30 praca
+   */
+  SECOND_SHIFT: {
+    name: 'Druga zmiana',
+    start: '14:00',
+    end: '21:30',
+    blocks: [
+      { type: 'work', start: '14:00', end: '18:00', label: 'Praca' },
+      { type: 'break', start: '18:00', end: '18:20', label: 'Przerwa' },
+      { type: 'work', start: '18:20', end: '21:30', label: 'Praca' }
+    ],
+    // Całkowity czas pracy w minutach: 4h + 3h10min = 430min = 7h10min
+    totalWorkMinutes: 430
+  },
+
+  /**
    * Domyślne wartości przelicznika godzin
    */
   DEFAULT_CONVERTER: {
@@ -70,10 +127,10 @@ const NormaConfig = {
   
   /**
    * Domyślni pracownicy zespołu
-   * Można edytować imiona i procenty wydajności
+   * Można edytować imiona i procenty wydajności (normy)
    */
   DEFAULT_TEAM: [
-    { id: 'worker1', name: 'Ja', efficiency: 110 },
+    { id: 'worker1', name: 'Dawid', efficiency: 110 },
     { id: 'worker2', name: 'Maciek', efficiency: 140 }
   ],
 

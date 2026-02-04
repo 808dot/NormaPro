@@ -795,7 +795,7 @@
   }
 
   /**
-   * Oblicza podział pracy w zespole
+   * Oblicza podział pracy w zespole z harmonogramem godzinowym
    */
   function calculateTeamDistribution() {
     const resultsContainer = $('team-results');
@@ -809,14 +809,6 @@
       showToast('Dodaj przynajmniej jeden mebel', 'error');
       return;
     }
-
-    // Oblicz łączną normę
-    let totalNorm = 0;
-    let totalQuantity = 0;
-    furnitureItems.forEach(item => {
-      totalNorm += item.norm * item.quantity;
-      totalQuantity += item.quantity;
-    });
 
     // Pobierz zaznaczonych pracowników
     const checkboxes = document.querySelectorAll('input[name="team-worker"]:checked');
@@ -832,83 +824,72 @@
       return;
     }
 
-    // Oblicz proporcjonalny podział normy według wydajności
-    const totalEfficiency = selectedWorkers.reduce((sum, w) => sum + w.efficiency, 0);
-    
-    const distribution = selectedWorkers.map(worker => {
-      const share = worker.efficiency / totalEfficiency;
-      const assignedNorm = totalNorm * share;
-      return {
-        name: worker.name,
-        efficiency: worker.efficiency,
-        assignedNorm: assignedNorm,
-        percentOfTotal: Math.round(share * 100),
-        basePercent: format2(assignedNorm)
-      };
-    });
+    // Użyj nowego kalkulatora z harmonogramem
+    const result = TeamCalculator.calculateTeamWork(selectedWorkers, furnitureItems);
 
-    // Przypisz meble do pracowników proporcjonalnie
-    const workerAssignments = distribution.map(w => ({
-      ...w,
-      furniture: [],
-      totalAssignedNorm: 0,
-      totalAssignedQty: 0
-    }));
-    
-    // Rozdziel meble między pracowników według ich udziału
-    for (const item of furnitureItems) {
-      // Oblicz ile sztuk przypada na każdego pracownika
-      let remainingQty = item.quantity;
-      
-      for (let i = 0; i < workerAssignments.length; i++) {
-        const worker = workerAssignments[i];
-        const workerShare = worker.percentOfTotal / 100;
-        
-        // Dla ostatniego pracownika - reszta
-        let assignedQty;
-        if (i === workerAssignments.length - 1) {
-          assignedQty = remainingQty;
-        } else {
-          assignedQty = Math.round(item.quantity * workerShare);
-          remainingQty -= assignedQty;
-        }
-        
-        if (assignedQty > 0) {
-          const assignedNorm = item.norm * assignedQty;
-          worker.furniture.push({
-            name: item.name,
-            quantity: assignedQty,
-            norm: item.norm,
-            assignedNorm: assignedNorm
-          });
-          worker.totalAssignedNorm += assignedNorm;
-          worker.totalAssignedQty += assignedQty;
-        }
-      }
+    if (!result.success) {
+      showToast(result.error || 'Błąd obliczeń', 'error');
+      return;
     }
 
     // Wyświetl wyniki
     resultsContainer?.classList.remove('hidden');
     
-    // Generuj karty pracowników z przypisanymi meblami
+    // Generuj karty pracowników z przypisanymi meblami i harmonogramem
     if (distributionContainer) {
       distributionContainer.innerHTML = '';
       
-      for (const worker of workerAssignments) {
-        const furnitureListHtml = worker.furniture.map(f => 
-          `<div class="furniture-item">
+      for (const worker of result.workers) {
+        // Lista mebli
+        const furnitureListHtml = worker.assignedFurniture.map(f => 
+          `<div class="furniture-item ${worker.normAnalysis.isExcess && f === worker.assignedFurniture[worker.assignedFurniture.length - 1] ? 'excess-item' : ''}">
             <span class="furniture-name">${f.name}</span>
             <span class="furniture-qty">${f.quantity} szt.</span>
-            <span class="furniture-percent">${format2(f.assignedNorm)}%</span>
+            <span class="furniture-percent">${f.totalNorm.toFixed(2)}%</span>
           </div>`
         ).join('');
         
+        // Harmonogram godzinowy
+        const hourlyPlanHtml = worker.hourlyProgress.hourlyPlan.map(hour => {
+          if (hour.isOvertime) {
+            return `
+              <div class="hourly-item excess-hour">
+                <span class="hour-time">⚠️ ${hour.time}</span>
+                <span class="hour-target">${hour.excessNorm}% nadmiar</span>
+                <div class="hour-furniture excess-furniture">
+                  ${hour.furniture.map(f => `<span class="mini-furniture">${f.name}</span>`).join('')}
+                </div>
+                <span class="hour-message">${hour.message}</span>
+              </div>
+            `;
+          }
+          
+          const furnitureNames = hour.furniture.length > 0 
+            ? hour.furniture.map(f => `<span class="mini-furniture">${f.name}</span>`).join('') 
+            : '<span class="no-furniture">—</span>';
+          
+          return `
+            <div class="hourly-item ${hour.isExcess ? 'excess-hour' : ''} ${hour.isEndOfBlock ? 'block-end' : ''}">
+              <span class="hour-time">${hour.time}</span>
+              <span class="hour-target">${hour.targetPercent}% (${hour.targetNorm}%)</span>
+              <span class="hour-cumulative">${hour.cumulativeNorm}% (${hour.cumulativeFurnitureCount} szt.)</span>
+              <div class="hour-furniture">${furnitureNames}</div>
+            </div>
+          `;
+        }).join('');
+        
+        // Status normy
+        const normStatusClass = worker.normAnalysis.isExcess ? 'excess-warning' : 'norm-ok';
+        const normStatusText = worker.normAnalysis.isExcess 
+          ? `⚠️ Nadmiar: ${worker.normAnalysis.excessFormatted}` 
+          : `✓ W normie (${worker.normAnalysis.fulfillmentPercent}%)`;
+        
         const card = document.createElement('div');
-        card.className = 'worker-card';
+        card.className = `worker-card ${worker.normAnalysis.isExcess ? 'has-excess' : ''}`;
         card.innerHTML = `
           <div class="worker-card-header">
             <span class="worker-name">${worker.name}</span>
-            <span class="worker-efficiency">${worker.efficiency}%</span>
+            <span class="worker-efficiency">Norma: ${worker.efficiency}%</span>
           </div>
           <div class="worker-card-body">
             <div class="stat-row">
@@ -917,40 +898,87 @@
                 <span class="stat-value">${worker.totalAssignedQty}</span>
               </div>
               <div class="stat">
-                <span class="stat-label">Norma</span>
-                <span class="stat-value">${format2(worker.totalAssignedNorm)}%</span>
+                <span class="stat-label">Przypisano</span>
+                <span class="stat-value">${worker.totalAssignedNorm.toFixed(2)}%</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Cel</span>
+                <span class="stat-value">${worker.efficiency}%</span>
               </div>
             </div>
+            
+            <div class="norm-status ${normStatusClass}">
+              ${normStatusText}
+            </div>
+            
             <div class="furniture-list">
+              <div class="furniture-list-header">Przypisane meble:</div>
               ${furnitureListHtml}
             </div>
+            
+            <details class="hourly-schedule">
+              <summary>📅 Harmonogram godzinowy</summary>
+              <div class="hourly-header">
+                <span>Godzina</span>
+                <span>Cel %</span>
+                <span>Zrobione</span>
+                <span>Meble</span>
+              </div>
+              <div class="hourly-plan">
+                ${hourlyPlanHtml}
+              </div>
+            </details>
           </div>
         `;
         distributionContainer.appendChild(card);
       }
     }
 
-    // Podsumowanie z listą mebli
+    // Podsumowanie z informacją o zmianie
     if (summaryContainer) {
-      const furnitureList = furnitureItems.map(item => 
-        `${item.name} × ${item.quantity} (${format2(item.norm * item.quantity)}%)`
-      ).join('<br>');
+      const shiftBlocksHtml = result.shiftInfo.blocks.map(block => 
+        `<span class="shift-block ${block.type}">${block.start}-${block.end} (${block.label})</span>`
+      ).join(' ');
+      
+      const excessWarning = result.summary.teamHasExcess 
+        ? `<div class="team-excess-warning">⚠️ NADMIAR: Praca przekracza łączną normę zespołu o ${result.summary.teamExcessAmount}%</div>` 
+        : '';
 
       summaryContainer.innerHTML = `
+        <div class="shift-info">
+          <div class="shift-name">🕐 ${result.shiftInfo.name}</div>
+          <div class="shift-dates">${result.shiftInfo.cycleStart} - ${result.shiftInfo.cycleEnd}</div>
+          <div class="shift-blocks">${shiftBlocksHtml}</div>
+        </div>
+        
+        ${excessWarning}
+        
         <div class="summary-row">
           <span>Suma normy:</span>
-          <strong>${format2(totalNorm)}%</strong>
+          <strong>${result.summary.totalNorm}%</strong>
         </div>
         <div class="summary-row">
           <span>Łączna ilość:</span>
-          <strong>${totalQuantity} szt.</strong>
+          <strong>${result.summary.totalFurnitureQty} szt.</strong>
         </div>
-        <div class="summary-furniture">
-          <span class="summary-furniture-label">Meble do wykonania:</span>
-          <div class="summary-furniture-list">${furnitureList}</div>
+        <div class="summary-row">
+          <span>Suma norm zespołu:</span>
+          <strong>${result.summary.totalTeamEfficiency}%</strong>
         </div>
       `;
     }
+
+    // POPRAWKA: Przewiń do wyników po obliczeniu (łagodnie)
+    // Odczekaj chwilę na renderowanie DOM, potem przewiń
+    setTimeout(() => {
+      if (resultsContainer) {
+        resultsContainer.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'nearest',
+          inline: 'nearest'
+        });
+      }
+    }, 100);
   }
 
   /**
@@ -959,9 +987,23 @@
   function initTeamCalculator() {
     const calcBtn = $('calc-team');
     const addBtn = $('add-team-row');
+    const backToTopBtn = $('back-to-top');
     
     calcBtn?.addEventListener('click', calculateTeamDistribution);
     addBtn?.addEventListener('click', addTeamRow);
+    
+    // Przycisk "Wróć na górę"
+    backToTopBtn?.addEventListener('click', () => {
+      // Przewiń do sekcji zespołu (na górę formularza)
+      const teamSection = $('team-section');
+      if (teamSection) {
+        teamSection.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
+        });
+      }
+    });
     
     // NIE dodawaj wiersza tutaj - dane nie są jeszcze załadowane
     // Wiersz zostanie dodany po załadowaniu danych w initApp

@@ -96,9 +96,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
   padding: var(--space-sm);
   overflow-x: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
 }
 
 /* Nowoczesne viewport units */
@@ -110,14 +107,10 @@ body {
    KONTENER GŁÓWNY
    ============================================ */
 .container {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   width: fit-content;
   min-width: 320px;
   max-width: 95vw;
-  margin: 0 auto;
+  margin: var(--space-lg) auto;
   padding: 8px 12px;
   background: var(--card);
   border-radius: var(--radius);
@@ -1418,6 +1411,261 @@ select optgroup option {
   margin: 0;
   font-size: 0.7rem;
   color: var(--muted);
+}
+
+/* ============================================
+   HARMONOGRAM GODZINOWY - KALKULATOR ZESPOŁOWY
+   ============================================ */
+
+/* Nagłówek sekcji wyników */
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.results-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+/* Informacje o zmianie */
+.shift-info {
+  background: var(--soft);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--border);
+}
+
+.shift-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: var(--space-xs);
+}
+
+.shift-dates {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: var(--space-sm);
+}
+
+.shift-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.shift-block {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.shift-block.work {
+  background: var(--success-light);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.shift-block.break {
+  background: var(--warning-light);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+/* Ostrzeżenie o nadmiarze */
+.team-excess-warning {
+  background: var(--error-light);
+  border: 1px solid var(--error);
+  color: var(--error);
+  padding: var(--space-md);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-md);
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* Status normy pracownika */
+.norm-status {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: var(--space-sm) 0;
+  text-align: center;
+}
+
+.norm-status.norm-ok {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.norm-status.excess-warning {
+  background: var(--error-light);
+  color: var(--error);
+}
+
+/* Karta pracownika z nadmiarem */
+.worker-card.has-excess {
+  border-color: var(--error);
+}
+
+.worker-card.has-excess .worker-card-header {
+  background: var(--error-light);
+}
+
+/* Lista mebli w karcie */
+.furniture-list-header {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: var(--space-xs);
+  font-weight: 500;
+}
+
+.furniture-item.excess-item {
+  background: var(--error-light);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+}
+
+/* Harmonogram godzinowy (details/summary) */
+.hourly-schedule {
+  margin-top: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.hourly-schedule summary {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--soft);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text);
+  user-select: none;
+}
+
+.hourly-schedule summary:hover {
+  background: var(--card-hover);
+}
+
+.hourly-schedule[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.hourly-header {
+  display: grid;
+  grid-template-columns: 60px 90px 90px 1fr;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--soft);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+.hourly-plan {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.hourly-item {
+  display: grid;
+  grid-template-columns: 60px 90px 90px 1fr;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.7rem;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.hourly-item:last-child {
+  border-bottom: none;
+}
+
+.hourly-item.block-end {
+  background: var(--soft);
+}
+
+.hourly-item.excess-hour {
+  background: var(--error-light);
+}
+
+.hour-time {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hour-target {
+  color: var(--muted);
+}
+
+.hour-cumulative {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.hour-furniture {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.mini-furniture {
+  font-size: 0.6rem;
+  padding: 1px 4px;
+  background: var(--accent-light);
+  border-radius: 3px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.no-furniture {
+  color: var(--muted);
+}
+
+.hour-message {
+  grid-column: 1 / -1;
+  color: var(--error);
+  font-weight: 500;
+  font-size: 0.65rem;
+  margin-top: var(--space-xs);
+}
+
+.excess-furniture .mini-furniture {
+  background: var(--error-light);
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+/* Responsywność harmonogramu */
+@media (max-width: 480px) {
+  .hourly-header,
+  .hourly-item {
+    grid-template-columns: 50px 70px 70px 1fr;
+    font-size: 0.6rem;
+  }
+  
+  .mini-furniture {
+    font-size: 0.55rem;
+  }
+  
+  .shift-blocks {
+    flex-direction: column;
+  }
 }
 
 /* ============================================
