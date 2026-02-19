@@ -1312,18 +1312,25 @@
    * @returns {Promise<Object>}
    */
   async function loadFurnitureData() {
-    // Najpierw użyj wbudowanych danych
+    // Preferuj zewnętrzny JSON (jeśli serwer udostępnia plik),
+    // w przeciwnym razie użyj wbudowanych danych `FURNITURE_DATA`.
+    try {
+      const res = await fetch('data/furniture.json');
+      if (res.ok) {
+        const json = await res.json();
+        if (json && Object.keys(json).length > 0) return json;
+      }
+    } catch (e) {
+      // fetch może nie działać przy otwieraniu pliku lokalnie (file://)
+      console.log('Nie udało się pobrać data/furniture.json — używam danych wbudowanych');
+    }
+
+    // Fallback: wbudowane dane w skrypcie
     if (Object.keys(FURNITURE_DATA).length > 0) {
       return FURNITURE_DATA;
     }
-    // Fallback do JSON (jeśli serwer dostępny)
-    try {
-      const res = await fetch('data/furniture.json');
-      if (res.ok) return res.json();
-    } catch (e) {
-      console.log('Używam wbudowanych danych mebli');
-    }
-    return FURNITURE_DATA;
+
+    return {};
   }
 
   // ============================================
