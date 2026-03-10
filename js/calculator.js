@@ -1262,67 +1262,39 @@
   }
 
   // ============================================
-  // DANE MEBLI (WBUDOWANE)
+  // DANE MEBLI
   // ============================================
-
-  /**
-   * Wbudowane dane mebli - działa bez serwera
-   */
-  const FURNITURE_DATA = {
-    "Azuro": 4.5,
-    "Roma": 4.125,
-    "Lizbona": 2.96,
-    "Stavia": 3.9,
-    "Karisa": 3,
-    "Atlantic": 5.33,
-    "Cocoli": 6,
-    "Trivento": 8.6,
-    "Flavia": 6.75,
-    "Veni": 5.54,
-    "Verde szelong M": 3.58,
-    "Verde siedz. 1-os": 2.3,
-    "Verde siedz. róg": 3.15,
-    "Verde siedz. 2.5-os": 3.35,
-    "Verde Sofa 2.5-os": 5.35,
-    "Verde Set-3": 7.93,
-    "Verde pufa": 1.4125,
-    "Colette Set-2": 10.5,
-    "Colette Set-4": 14.36,
-    "Espada Set-2": 8.57,
-    "Mega kanapa": 4.8,
-    "Espada pufa": 1.4,
-    "Espada Sofa 2.5-os": 6,
-    "Espada siedz. 2.5-os + Bok": 4.8,
-    "Espada siedz. 1-os + Bok": 4,
-    "Porto nar. bez boków": 4.133,
-    "Porto nar.": 6.26,
-    "Ariola nar.": 6.77,
-    "Besalu": 4.1,
-    "Nola": 3.6,
-    "Dali Set-2": 8.6,
-    "Carlo U": 14.4,
-    "Marsylia": 6.525,
-    "Segre": 5.12,
-    "Espada Set-4": 11.4,
-    "Noko": 5.5
-  };
+  // Usunięto wbudowany obiekt `FURNITURE_DATA` — dane pochodzą z
+  // `#furniture-data` w HTML lub z pliku `data/furniture.json`.
 
   /**
    * Ładuje dane mebli (wbudowane lub z JSON jako fallback)
    * @returns {Promise<Object>}
    */
   async function loadFurnitureData() {
-    // Preferuj zewnętrzny JSON (jeśli serwer udostępnia plik),
-    // w przeciwnym razie użyj wbudowanych danych `FURNITURE_DATA`.
+    // Najpierw spróbuj pobrać dane osadzone w HTML (np. przy otwarciu pliku lokalnie)
+    try {
+      const inline = document.getElementById('furniture-data');
+      if (inline && inline.textContent.trim()) {
+        const parsed = JSON.parse(inline.textContent);
+        if (parsed && Object.keys(parsed).length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Nie udało się sparsować osadzonych danych furniture-data:', e);
+    }
+
+    // Następnie spróbuj pobrać z pliku JSON (działa na serwerach i GitHub Pages)
     try {
       const res = await fetch('data/furniture.json');
       if (res.ok) {
         const json = await res.json();
         if (json && Object.keys(json).length > 0) return json;
+      } else {
+        console.warn('fetch data/furniture.json zwrócił status', res.status);
       }
     } catch (e) {
       // fetch może nie działać przy otwieraniu pliku lokalnie (file://)
-      console.log('Nie udało się pobrać data/furniture.json — używam danych wbudowanych');
+      console.log('Nie udało się pobrać data/furniture.json — fetch nieudany', e);
     }
 
     // Fallback: wbudowane dane w skrypcie
@@ -1376,13 +1348,13 @@
       
     } catch (err) {
       console.error('Błąd inicjalizacji:', err);
-      // Nawet przy błędzie, spróbuj użyć wbudowanych danych
-      if (Object.keys(furnitureMap).length === 0) {
-        furnitureMap = FURNITURE_DATA;
-        furnitureNames = Object.keys(furnitureMap).sort((a, b) => a.localeCompare(b, 'pl'));
-        addRow();
-        addTeamRow();
-      }
+        // Nawet przy błędzie, ustaw pustą mapę (selecty będą miały tylko placeholder)
+        if (Object.keys(furnitureMap).length === 0) {
+          furnitureMap = {};
+          furnitureNames = [];
+          addRow();
+          addTeamRow();
+        }
     }
   });
 

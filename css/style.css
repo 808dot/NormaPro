@@ -96,6 +96,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   padding: var(--space-sm);
   overflow-x: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Nowoczesne viewport units */
@@ -110,12 +113,15 @@ body {
   width: fit-content;
   min-width: 320px;
   max-width: 95vw;
-  margin: var(--space-lg) auto;
+  margin: auto;
   padding: 8px 12px;
   background: var(--card);
   border-radius: var(--radius);
   border: 1px solid var(--border);
   overflow-x: hidden;
+  /* Ensure container won't exceed viewport height — allow scrolling inside */
+  max-height: calc(100vh - 48px);
+  overflow: auto;
 }
 
 /* DESKTOP */
