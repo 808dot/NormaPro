@@ -12,6 +12,7 @@
   "Cocoli": 6,
   "Dali Set-2": 8.6,
   "Dali Set-4": 10.5,
+  "Dali sofa 2.5-os": 5.95,
   "Ebra bez boków": 2.29,
   "Espada Set-2": 8.57,
   "Espada Set-4": 11.4,
@@ -32,12 +33,13 @@
   "Mona": 2.28,
   "Noko": 5.5,
   "Nola": 3.6,
-  "Porto Kanapa": 4.33,
+  "Porto kanapa": 4.33,
   "Porto nar.": 6.26,
   "Porto nar. bez boków": 4.133,
   "Rico": 3.8,
-  "Roma": 4.125,
+  "Roma": 3.8,
   "Santiago nar.": 6.08,
+  "Santiago kanapa": 4.1,
   "Segre": 5.12,
   "Spark Kanapa": 3.5,
   "Spark narożnik": 6.35,
@@ -54,8 +56,12 @@
   "Verde szelong M": 3.58,
   "Veni": 5.54,
   "Veni bez boków": 4.2,
-  "Velu": 6.5,
+  "Velu": 7.1,
   "Zoja": 1.425,
   "Spark Kanapa": 4.1,
-  "Bravo": 1.415
+  "Bravo": 1.415,
+  "Nicole": 3.8,
+  "Sienna": 3.58,
+  "Allen sofa": 3.7
+
 }
